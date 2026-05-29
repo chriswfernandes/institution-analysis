@@ -37,8 +37,14 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, documents: action.payload }
     case 'SET_DB_READY':
       return { ...state, dbReady: true }
-    case 'ADD_TOAST':
+    case 'ADD_TOAST': {
+      const now = Date.now()
+      const isDuplicate = state.toasts.some(
+        (t) => t.message === action.payload.message && now - parseInt(t.id, 10) < 2000
+      )
+      if (isDuplicate) return state
       return { ...state, toasts: [...state.toasts, action.payload] }
+    }
     case 'REMOVE_TOAST':
       return { ...state, toasts: state.toasts.filter((t) => t.id !== action.payload) }
     default:

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Building2 } from 'lucide-react'
+import { Plus, Search, Building2, BarChart2 } from 'lucide-react'
 import { query, execute, saveDb } from '../db/db'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { SlideOver } from '../components/SlideOver'
@@ -63,14 +63,22 @@ export function Institutions() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold text-slate-900">Institutions</h1>
-        <button
-          onClick={() => { setEditing(null); setSlideOpen(true) }}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
-        >
-          <Plus size={16} /> Add Institution
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/institutions/compare')}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200"
+          >
+            <BarChart2 size={16} /> Compare
+          </button>
+          <button
+            onClick={() => { setEditing(null); setSlideOpen(true) }}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
+          >
+            <Plus size={16} /> Add Institution
+          </button>
+        </div>
       </div>
 
       <div className="relative mb-4">

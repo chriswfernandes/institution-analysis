@@ -8,6 +8,7 @@ import { Institutions } from './pages/Institutions'
 import { InstitutionDetail } from './pages/InstitutionDetail'
 import { Documents } from './pages/Documents'
 import { Analysis } from './pages/Analysis'
+import { ComparisonView } from './pages/ComparisonView'
 import { Settings } from './pages/Settings'
 import { ProcessingStatusBar } from './components/ProcessingStatusBar'
 import { initDb } from './db/db'
@@ -41,6 +42,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="institutions" element={<Institutions />} />
+        <Route path="institutions/compare" element={<ComparisonView />} />
         <Route path="institutions/:id" element={<InstitutionDetail />} />
         <Route path="documents" element={<Documents />} />
         <Route path="analysis" element={<Analysis />} />
