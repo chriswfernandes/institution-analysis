@@ -67,6 +67,16 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 
 ---
 
+## Phase 4.1 — Seed Data for UI Preview
+**File:** `PRP_Phase4.1_Seed_Data.md`
+
+- [ ] `src/db/seedData.ts` inserts 2 institutions (UBC, UToronto), 3 documents, multi-year financials, strategic plans/priorities, KPIs, sustainability metrics
+- [ ] "Load Sample Data" button in Settings → Developer Tools section
+- [ ] Confirm dialog warns existing data is not affected (seed is additive)
+- [ ] Loading twice shows graceful error toast
+
+---
+
 ## Phase 5 — AI Analysis & Insights
 **File:** `PRP_Phase5_AI_Analysis.md`
 

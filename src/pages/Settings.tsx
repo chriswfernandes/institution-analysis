@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { Eye, EyeOff, Plus, Trash2, Download, Upload } from 'lucide-react'
+import { Eye, EyeOff, Plus, Trash2, Download, Upload, FlaskConical } from 'lucide-react'
 import { getSetting, setSetting, exportDb, importDb, query, execute, saveDb } from '../db/db'
+import { getAllDocuments } from '../db/documentDb'
 import { useAppDispatch, useAppState } from '../context/AppContext'
 import { useToast } from '../components/useToast'
 import { testConnection } from '../services/aiService'
-import type { Tag } from '../types'
+import { seedDatabase } from '../db/seedData'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import type { Tag, Institution } from '../types'
 
 const PRESET_COLOURS = ['#16a34a','#2563eb','#dc2626','#d97706','#9333ea','#0891b2']
 
@@ -25,6 +28,7 @@ export function Settings() {
   const [newTagColour, setNewTagColour] = useState(PRESET_COLOURS[0])
 
   const importRef = useRef<HTMLInputElement>(null)
+  const [seedConfirmOpen, setSeedConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (!dbReady) return
@@ -87,6 +91,24 @@ export function Settings() {
     saveDb()
     loadTags()
     showToast('success', 'Tag deleted')
+  }
+
+  function handleSeedData() {
+    try {
+      seedDatabase()
+      const institutions = query<Institution>(
+        `SELECT i.*, COUNT(d.id) as document_count FROM institutions i
+         LEFT JOIN documents d ON d.institution_id = i.id
+         GROUP BY i.id ORDER BY i.name`
+      )
+      dispatch({ type: 'SET_INSTITUTIONS', payload: institutions })
+      const tags = query<Tag>('SELECT * FROM tags ORDER BY name')
+      dispatch({ type: 'SET_TAGS', payload: tags })
+      dispatch({ type: 'SET_DOCUMENTS', payload: getAllDocuments() })
+      showToast('success', 'Sample data loaded — 2 institutions, 3 documents, full financial and strategic data')
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Failed to load sample data')
+    }
   }
 
   return (
@@ -208,6 +230,32 @@ export function Settings() {
           </button>
         </div>
       </section>
+
+      {/* Developer Tools */}
+      <section className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-base font-semibold text-slate-900 mb-1 flex items-center gap-2">
+          <FlaskConical size={16} className="text-slate-400" /> Developer Tools
+        </h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Load realistic sample data to preview all data views without uploading real documents.
+        </p>
+        <button
+          onClick={() => setSeedConfirmOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
+        >
+          <FlaskConical size={14} /> Load Sample Data
+        </button>
+      </section>
+
+      <ConfirmDialog
+        open={seedConfirmOpen}
+        title="Load Sample Data"
+        message="This will add 2 sample institutions (UBC and UToronto) with documents, financials, strategic plans, KPIs, and sustainability data. Your existing data will not be affected."
+        confirmLabel="Load Sample Data"
+        danger={false}
+        onConfirm={() => { setSeedConfirmOpen(false); handleSeedData() }}
+        onCancel={() => setSeedConfirmOpen(false)}
+      />
     </div>
   )
 }
