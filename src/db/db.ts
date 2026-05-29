@@ -6,7 +6,7 @@ let db: Database | null = null
 
 export async function initDb(): Promise<void> {
   const SQL: SqlJsStatic = await initSqlJs({
-    locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
+    locateFile: (file: string) => `/${file}`,
   })
 
   const saved = localStorage.getItem(DB_KEY)
@@ -64,7 +64,7 @@ export function exportDb(): void {
 
 export async function importDb(file: File): Promise<void> {
   const SQL: SqlJsStatic = await initSqlJs({
-    locateFile: (f: string) => `https://sql.js.org/dist/${f}`,
+    locateFile: (f: string) => `/${f}`,
   })
   const buffer = await file.arrayBuffer()
   db = new SQL.Database(new Uint8Array(buffer))
