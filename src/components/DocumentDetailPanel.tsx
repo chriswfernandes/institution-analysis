@@ -1,16 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { SlideOver } from './SlideOver'
 import { ConfirmDialog } from './ConfirmDialog'
 import { StatusBadge } from './StatusBadge'
+import { ClassificationConfirmModal } from './ClassificationConfirmModal'
 import { getDocument, getChunks, deleteDocument } from '../db/documentDb'
 import { getAllDocuments } from '../db/documentDb'
 import { useAppDispatch } from '../context/AppContext'
 import { useToast } from './useToast'
-import type { DocumentRow, ChunkRow } from '../types'
+import { runProcessingPipeline } from '../services/processingPipeline'
+import type { DocumentRow, ChunkRow, ClassificationResult } from '../types'
 
 interface Props {
   documentId: number | null
   onClose: () => void
+}
+
+interface PendingConfirm {
+  result: ClassificationResult
+  resolve: (confirmed: ClassificationResult | null) => void
 }
 
 export function DocumentDetailPanel({ documentId, onClose }: Props) {
@@ -20,6 +27,9 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
   const [chunks, setChunks] = useState<ChunkRow[]>([])
   const [showText, setShowText] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmReprocess, setConfirmReprocess] = useState(false)
+  const [reprocessing, setReprocessing] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null)
 
   useEffect(() => {
     if (documentId === null) { setDoc(null); setChunks([]); return }
@@ -28,6 +38,12 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
     setShowText(false)
   }, [documentId])
 
+  function refreshDoc() {
+    if (documentId === null) return
+    setDoc(getDocument(documentId))
+    dispatch({ type: 'SET_DOCUMENTS', payload: getAllDocuments() })
+  }
+
   function handleDelete() {
     if (!doc) return
     deleteDocument(doc.id)
@@ -35,6 +51,38 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
     showToast('success', `${doc.filename} deleted`)
     onClose()
   }
+
+  const waitForConfirmation = useCallback(
+    (result: ClassificationResult): Promise<ClassificationResult | null> =>
+      new Promise((resolve) => setPendingConfirm({ result, resolve })),
+    []
+  )
+
+  async function handleReprocess() {
+    if (!doc) return
+    setReprocessing(true)
+    try {
+      await runProcessingPipeline(
+        doc.id,
+        doc.institution_id,
+        () => { /* no status bar here — just refresh when done */ },
+        (result) => waitForConfirmation(result)
+      )
+      refreshDoc()
+      showToast('success', `${doc.filename} re-processed successfully`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (!msg.includes('Cancelled')) {
+        showToast('error', `Re-processing failed: ${msg}`)
+      }
+      refreshDoc()
+    } finally {
+      setReprocessing(false)
+    }
+  }
+
+  const canReprocess =
+    doc?.processing_status === 'failed' || doc?.processing_status === 'processed'
 
   return (
     <>
@@ -45,7 +93,7 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <MetaItem label="Institution" value={doc.institution_name} />
               <MetaItem label="Status">
-                <StatusBadge status={doc.processing_status} />
+                <StatusBadge status={doc.processing_status.charAt(0).toUpperCase() + doc.processing_status.slice(1)} />
               </MetaItem>
               <MetaItem label="Type" value={doc.document_type ?? '—'} />
               <MetaItem label="Fiscal Year" value={doc.fiscal_year ?? '—'} />
@@ -65,11 +113,16 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
             {/* Actions */}
             <div className="flex gap-2 pt-1">
               <button
-                disabled
-                title="Available in Phase 3"
-                className="flex-1 px-3 py-2 text-sm font-medium bg-slate-100 text-slate-400 rounded-lg cursor-not-allowed"
+                disabled={!canReprocess || reprocessing}
+                onClick={() => setConfirmReprocess(true)}
+                title={canReprocess ? 'Re-run AI extraction' : 'Only available for processed or failed documents'}
+                className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  canReprocess && !reprocessing
+                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                }`}
               >
-                Re-process
+                {reprocessing ? 'Processing…' : 'Re-process'}
               </button>
               <button
                 onClick={() => setConfirmDelete(true)}
@@ -108,6 +161,32 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
       />
+
+      <ConfirmDialog
+        open={confirmReprocess}
+        title="Re-process Document"
+        message="This will overwrite existing extracted data for this document. Continue?"
+        confirmLabel="Re-process"
+        danger={false}
+        onConfirm={() => { setConfirmReprocess(false); handleReprocess() }}
+        onCancel={() => setConfirmReprocess(false)}
+      />
+
+      {pendingConfirm && (
+        <ClassificationConfirmModal
+          open
+          result={pendingConfirm.result}
+          filename={doc?.filename ?? ''}
+          onConfirm={(confirmed) => {
+            setPendingConfirm(null)
+            pendingConfirm.resolve(confirmed)
+          }}
+          onCancel={() => {
+            pendingConfirm.resolve(null)
+            setPendingConfirm(null)
+          }}
+        />
+      )}
     </>
   )
 }

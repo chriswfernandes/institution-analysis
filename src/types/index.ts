@@ -45,3 +45,75 @@ export interface ChunkRow {
   chunk_text: string
   token_estimate: number | null
 }
+
+export interface ClassificationResult {
+  documentType: 'Financial Statement' | 'Strategic Plan' | 'Sustainability Report' | 'Annual Report' | 'Other'
+  fiscalYear: string | null
+  institutionName: string | null
+  confidence: number
+}
+
+export interface FinancialExtraction {
+  fiscalYear: string | null
+  totalRevenue: number | null
+  totalExpenses: number | null
+  netSurplusDeficit: number | null
+  operatingRevenue: number | null
+  operatingExpenses: number | null
+  governmentGrants: number | null
+  tuitionRevenue: number | null
+  researchRevenue: number | null
+  investmentIncome: number | null
+  totalAssets: number | null
+  totalLiabilities: number | null
+  netAssets: number | null
+  endowmentValue: number | null
+  internationalStudentRevenue: number | null
+  notes: string | null
+}
+
+export interface StrategicPriority {
+  priorityName: string
+  priorityDescription: string | null
+  pillar: string | null
+  progressStatus: 'On Track' | 'At Risk' | 'Achieved' | 'Unknown'
+  keyInitiatives: string[]
+}
+
+export interface StrategicExtraction {
+  planName: string | null
+  planPeriodStart: string | null
+  planPeriodEnd: string | null
+  visionStatement: string | null
+  priorities: StrategicPriority[]
+}
+
+export interface SustainabilityExtraction {
+  fiscalYear: string | null
+  ghgEmissionsTotal: number | null
+  ghgScope1: number | null
+  ghgScope2: number | null
+  ghgScope3: number | null
+  emissionsUnit: string | null
+  energyConsumption: number | null
+  energyUnit: string | null
+  renewableEnergyPct: number | null
+  wasteDiversionRate: number | null
+  waterConsumption: number | null
+  netZeroTargetYear: string | null
+  sustainabilityCertifications: string[]
+  notes: string | null
+}
+
+export interface KeyFact {
+  kpiName: string
+  kpiCategory: string
+  value: number | null
+  unit: string | null
+  fiscalYear: string | null
+  notes: string | null
+}
+
+export interface KeyFactsExtraction {
+  facts: KeyFact[]
+}

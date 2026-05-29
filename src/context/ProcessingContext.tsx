@@ -1,6 +1,16 @@
 import { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react'
 
-export type ProcessingStep = 'reading' | 'extracting' | 'chunking' | 'saving'
+export type ProcessingStep =
+  | 'reading'
+  | 'extracting'
+  | 'chunking'
+  | 'saving'
+  | 'classifying'
+  | 'awaiting_confirmation'
+  | 'extracting_data'
+  | 'writing_db'
+  | 'complete'
+  | 'failed'
 
 export interface ProcessingJob {
   id: string

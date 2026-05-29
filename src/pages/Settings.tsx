@@ -3,6 +3,7 @@ import { Eye, EyeOff, Plus, Trash2, Download, Upload } from 'lucide-react'
 import { getSetting, setSetting, exportDb, importDb, query, execute, saveDb } from '../db/db'
 import { useAppDispatch, useAppState } from '../context/AppContext'
 import { useToast } from '../components/useToast'
+import { testConnection } from '../services/aiService'
 import type { Tag } from '../types'
 
 const PRESET_COLOURS = ['#16a34a','#2563eb','#dc2626','#d97706','#9333ea','#0891b2']
@@ -126,7 +127,12 @@ export function Settings() {
             className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
             Save Settings
           </button>
-          <button onClick={() => showToast('info', 'Test Connection will be available in Phase 3.')}
+          <button
+            onClick={async () => {
+              showToast('info', 'Testing connection…')
+              const result = await testConnection()
+              showToast(result.success ? 'success' : 'error', result.message)
+            }}
             className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">
             Test Connection
           </button>

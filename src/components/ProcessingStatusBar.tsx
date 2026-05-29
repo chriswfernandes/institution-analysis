@@ -6,6 +6,12 @@ const STEP_LABELS: Record<ProcessingStep, string> = {
   extracting: 'Extracting text…',
   chunking: 'Chunking…',
   saving: 'Saving…',
+  classifying: 'Classifying…',
+  awaiting_confirmation: 'Waiting for confirmation…',
+  extracting_data: 'Extracting data…',
+  writing_db: 'Writing to database…',
+  complete: 'Complete',
+  failed: 'Failed',
 }
 
 export function ProcessingStatusBar() {
