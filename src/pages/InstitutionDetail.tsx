@@ -11,6 +11,11 @@ import { DocumentUpload } from '../components/DocumentUpload'
 import { DocumentDetailPanel } from '../components/DocumentDetailPanel'
 import { StatusBadge } from '../components/StatusBadge'
 import { getDocumentsByInstitution } from '../db/documentDb'
+import { OverviewTab } from './tabs/OverviewTab'
+import { FinancialsTab } from './tabs/FinancialsTab'
+import { StrategicPrioritiesTab } from './tabs/StrategicPrioritiesTab'
+import { KPIsTab } from './tabs/KPIsTab'
+import { SustainabilityTab } from './tabs/SustainabilityTab'
 import type { Institution, Tag, DocumentRow } from '../types'
 
 const TABS = [
@@ -138,14 +143,12 @@ export function InstitutionDetail() {
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         {activeTab === 'overview' && <OverviewTab institutionId={institution.id} />}
         {activeTab === 'documents' && <DocumentsTab institutionId={institution.id} />}
-        {activeTab !== 'overview' && activeTab !== 'documents' && (
-          <p className="text-sm text-slate-400 text-center py-8">
-            {activeTab === 'financials' && 'Financial data will appear after documents are processed.'}
-            {activeTab === 'priorities' && 'Strategic priorities will appear after documents are processed.'}
-            {activeTab === 'kpis' && 'KPI data will appear after documents are processed.'}
-            {activeTab === 'sustainability' && 'Sustainability data will appear after documents are processed.'}
-            {activeTab === 'insights' && 'AI insights will be available in Phase 5.'}
-          </p>
+        {activeTab === 'financials' && <FinancialsTab institutionId={institution.id} />}
+        {activeTab === 'priorities' && <StrategicPrioritiesTab institutionId={institution.id} />}
+        {activeTab === 'kpis' && <KPIsTab institutionId={institution.id} />}
+        {activeTab === 'sustainability' && <SustainabilityTab institutionId={institution.id} />}
+        {activeTab === 'insights' && (
+          <p className="text-sm text-slate-400 text-center py-8">AI insights will be available in Phase 5.</p>
         )}
       </div>
 
@@ -221,26 +224,3 @@ function DocumentsTab({ institutionId }: { institutionId: number }) {
   )
 }
 
-function OverviewTab({ institutionId }: { institutionId: number }) {
-  const [docCount] = query<{ c: number }>('SELECT COUNT(*) as c FROM documents WHERE institution_id = ?', [institutionId])
-  const [priorityCount] = query<{ c: number }>('SELECT COUNT(*) as c FROM strategic_priorities WHERE institution_id = ?', [institutionId])
-  const [insightCount] = query<{ c: number }>('SELECT COUNT(*) as c FROM analysis_findings WHERE institution_id = ?', [institutionId])
-
-  return (
-    <div>
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {[
-          { label: 'Documents', value: docCount?.c ?? 0 },
-          { label: 'Priorities', value: priorityCount?.c ?? 0 },
-          { label: 'Insights', value: insightCount?.c ?? 0 },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-slate-50 rounded-lg p-4 text-center">
-            <p className="text-2xl font-bold text-slate-900">{value}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{label}</p>
-          </div>
-        ))}
-      </div>
-      <p className="text-sm text-slate-400 text-center">Upload documents to populate this institution's intelligence.</p>
-    </div>
-  )
-}
