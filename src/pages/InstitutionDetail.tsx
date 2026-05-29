@@ -7,7 +7,11 @@ import { useToast } from '../components/useToast'
 import { SlideOver } from '../components/SlideOver'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { InstitutionForm } from '../components/InstitutionForm'
-import type { Institution, Tag } from '../types'
+import { DocumentUpload } from '../components/DocumentUpload'
+import { DocumentDetailPanel } from '../components/DocumentDetailPanel'
+import { StatusBadge } from '../components/StatusBadge'
+import { getDocumentsByInstitution } from '../db/documentDb'
+import type { Institution, Tag, DocumentRow } from '../types'
 
 const TABS = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -133,9 +137,9 @@ export function InstitutionDetail() {
       {/* Tab content */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         {activeTab === 'overview' && <OverviewTab institutionId={institution.id} />}
-        {activeTab !== 'overview' && (
+        {activeTab === 'documents' && <DocumentsTab institutionId={institution.id} />}
+        {activeTab !== 'overview' && activeTab !== 'documents' && (
           <p className="text-sm text-slate-400 text-center py-8">
-            {activeTab === 'documents' && 'Document upload will be available in Phase 2.'}
             {activeTab === 'financials' && 'Financial data will appear after documents are processed.'}
             {activeTab === 'priorities' && 'Strategic priorities will appear after documents are processed.'}
             {activeTab === 'kpis' && 'KPI data will appear after documents are processed.'}
@@ -157,6 +161,61 @@ export function InstitutionDetail() {
         danger
         onConfirm={handleDelete}
         onCancel={() => setDeleteOpen(false)}
+      />
+    </div>
+  )
+}
+
+function DocumentsTab({ institutionId }: { institutionId: number }) {
+  const [docs, setDocs] = useState<DocumentRow[]>(() => getDocumentsByInstitution(institutionId))
+  const [selectedDocId, setSelectedDocId] = useState<number | null>(null)
+
+  function refresh() {
+    setDocs(getDocumentsByInstitution(institutionId))
+  }
+
+  return (
+    <div className="space-y-4">
+      <DocumentUpload institutionId={institutionId} onUploaded={refresh} />
+
+      {docs.length === 0 ? (
+        <p className="text-sm text-slate-400 text-center py-4">No documents yet. Upload a PDF above.</p>
+      ) : (
+        <div className="overflow-hidden border border-slate-200 rounded-lg">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-2.5 font-medium text-slate-600">Filename</th>
+                <th className="text-left px-4 py-2.5 font-medium text-slate-600">Status</th>
+                <th className="text-right px-4 py-2.5 font-medium text-slate-600">Pages</th>
+                <th className="text-right px-4 py-2.5 font-medium text-slate-600">Words</th>
+                <th className="text-left px-4 py-2.5 font-medium text-slate-600">Uploaded</th>
+              </tr>
+            </thead>
+            <tbody>
+              {docs.map((doc) => (
+                <tr
+                  key={doc.id}
+                  onClick={() => setSelectedDocId(doc.id)}
+                  className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer"
+                >
+                  <td className="px-4 py-3 font-medium text-slate-800 max-w-xs truncate">{doc.filename}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={doc.processing_status.charAt(0).toUpperCase() + doc.processing_status.slice(1)} />
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 text-right">{doc.page_count ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-600 text-right">{doc.word_count?.toLocaleString() ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-500">{doc.upload_date ? doc.upload_date.slice(0, 10) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <DocumentDetailPanel
+        documentId={selectedDocId}
+        onClose={() => { setSelectedDocId(null); refresh() }}
       />
     </div>
   )

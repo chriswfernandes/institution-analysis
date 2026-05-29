@@ -37,3 +37,11 @@ export interface DocumentRow {
   page_count: number | null
   word_count: number | null
 }
+
+export interface ChunkRow {
+  id: number
+  document_id: number
+  chunk_index: number
+  chunk_text: string
+  token_estimate: number | null
+}
