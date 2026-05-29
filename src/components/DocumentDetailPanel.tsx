@@ -8,6 +8,7 @@ import { getAllDocuments } from '../db/documentDb'
 import { useAppDispatch } from '../context/AppContext'
 import { useToast } from './useToast'
 import { runProcessingPipeline } from '../services/processingPipeline'
+import { runQuickInsights } from '../services/analysisPipeline'
 import type { DocumentRow, ChunkRow, ClassificationResult } from '../types'
 
 interface Props {
@@ -81,6 +82,21 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
     }
   }
 
+  const [quickRunning, setQuickRunning] = useState(false)
+
+  async function handleQuickInsights() {
+    if (!doc) return
+    setQuickRunning(true)
+    try {
+      await runQuickInsights(doc.id, doc.institution_id, doc.institution_name, () => {})
+      showToast('success', 'Quick insights generated — view in the Insights tab')
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Quick insights failed')
+    } finally {
+      setQuickRunning(false)
+    }
+  }
+
   const canReprocess =
     doc?.processing_status === 'failed' || doc?.processing_status === 'processed'
 
@@ -111,7 +127,7 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 pt-1">
+            <div className="flex gap-2 pt-1 flex-wrap">
               <button
                 disabled={!canReprocess || reprocessing}
                 onClick={() => setConfirmReprocess(true)}
@@ -124,6 +140,15 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
               >
                 {reprocessing ? 'Processing…' : 'Re-process'}
               </button>
+              {doc.processing_status === 'processed' && (
+                <button
+                  disabled={quickRunning}
+                  onClick={handleQuickInsights}
+                  className="flex-1 px-3 py-2 text-sm font-medium bg-green-50 text-green-700 rounded-lg hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {quickRunning ? 'Analysing…' : 'Quick Insights'}
+                </button>
+              )}
               <button
                 onClick={() => setConfirmDelete(true)}
                 className="flex-1 px-3 py-2 text-sm font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100"

@@ -117,3 +117,39 @@ export interface KeyFact {
 export interface KeyFactsExtraction {
   facts: KeyFact[]
 }
+
+export interface AnalysisRunRow {
+  id: number
+  institution_id: number
+  run_type: string
+  status: string
+  started_at: string
+  completed_at: string | null
+  finding_count?: number
+}
+
+export interface FindingRow {
+  id: number
+  analysis_run_id: number
+  institution_id: number
+  finding_type: string
+  title: string
+  narrative: string
+  priority_rank: number | null
+  relevant_service_line: string | null
+}
+
+export interface ParsedFinding {
+  finding_type: 'ConsultingOpportunity' | 'Risk' | 'Strength' | 'Trend' | 'Weakness'
+  title: string
+  narrative: string
+  priority_rank: number | null
+  relevant_service_line: string | null
+}
+
+export interface ProposedTheme {
+  themeId: number
+  themeName: string
+  evidence: string
+  relevanceScore: number
+}

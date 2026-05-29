@@ -341,6 +341,52 @@ ${chunk.chunk_text}
   return { facts: allFacts }
 }
 
+export async function generateInsights(institutionName: string, compiledData: string): Promise<string> {
+  const { endpoint, apiKey, deployment, apiVersion } = getAzureConfig()
+  const url = `${endpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`
+
+  const userPrompt = `You are a senior consultant at Deloitte Canada's Government & Public Services Higher Education practice.
+
+You have been given structured data about ${institutionName}, a Canadian post-secondary institution. Your task is to produce a consulting intelligence briefing that a partner would use to prepare for a client meeting.
+
+Respond in well-structured markdown with exactly these four sections:
+
+## Top Consulting Opportunities
+List the top 5 consulting opportunities, numbered 1–5 (highest priority first). For each, write a short paragraph (3–5 sentences) explaining the opportunity, the underlying driver, and the potential Deloitte service line (e.g. Technology Advisory, Financial Advisory, Strategy, People & Change, Risk Advisory).
+
+## Key Risks & Challenges
+List 4–6 bullet points covering material risks (financial, operational, reputational, regulatory) that the institution faces.
+
+## Financial Health Summary
+Write 2–3 paragraphs summarizing the institution's financial position, trends in revenue/expenses, surplus/deficit trajectory, and endowment strength. Use a balanced tone — note both strengths and concerns.
+
+## Strategic Alignment Themes
+List the dominant strategic themes evident in the data (e.g. Indigenization, Digital Transformation, Enrolment Management). For each theme, one sentence of evidence from the data.
+
+---
+
+INSTITUTION DATA:
+${compiledData}`
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': apiKey },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content: userPrompt }],
+      temperature: 0.4,
+      max_tokens: 2000,
+    }),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Azure OpenAI error ${response.status}: ${text}`)
+  }
+
+  const data = await response.json()
+  return data.choices[0].message.content as string
+}
+
 // Merges an array of objects: first non-null value wins for each key
 function mergeFirstNonNull<T>(items: T[]): T {
   const result: Record<string, unknown> = {}

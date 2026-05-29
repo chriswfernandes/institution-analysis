@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Globe, Pencil, Trash2, FileText, BarChart2, Leaf, Target, TrendingUp, Lightbulb, LayoutDashboard } from 'lucide-react'
+import { ArrowLeft, Globe, Pencil, Trash2, FileText, BarChart2, Leaf, Target, TrendingUp, Lightbulb, LayoutDashboard, Sparkles } from 'lucide-react'
 import { query, execute, saveDb } from '../db/db'
 import { useAppDispatch } from '../context/AppContext'
 import { useToast } from '../components/useToast'
@@ -10,13 +10,16 @@ import { InstitutionForm } from '../components/InstitutionForm'
 import { DocumentUpload } from '../components/DocumentUpload'
 import { DocumentDetailPanel } from '../components/DocumentDetailPanel'
 import { StatusBadge } from '../components/StatusBadge'
+import { ThemeProposalModal } from '../components/ThemeProposalModal'
 import { getDocumentsByInstitution } from '../db/documentDb'
 import { OverviewTab } from './tabs/OverviewTab'
 import { FinancialsTab } from './tabs/FinancialsTab'
 import { StrategicPrioritiesTab } from './tabs/StrategicPrioritiesTab'
 import { KPIsTab } from './tabs/KPIsTab'
 import { SustainabilityTab } from './tabs/SustainabilityTab'
-import type { Institution, Tag, DocumentRow } from '../types'
+import { InsightsTab } from './tabs/InsightsTab'
+import { runFullAnalysis } from '../services/analysisPipeline'
+import type { Institution, Tag, DocumentRow, ProposedTheme } from '../types'
 
 const TABS = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -39,6 +42,11 @@ export function InstitutionDetail() {
   const [activeTab, setActiveTab] = useState('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [analysisRunning, setAnalysisRunning] = useState(false)
+  const [analysisStatus, setAnalysisStatus] = useState('')
+  const [insightsRefreshKey, setInsightsRefreshKey] = useState(0)
+  const [proposedThemes, setProposedThemes] = useState<ProposedTheme[]>([])
+  const [themeModalOpen, setThemeModalOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -67,6 +75,26 @@ export function InstitutionDetail() {
     dispatch({ type: 'SET_INSTITUTIONS', payload: institutions })
     showToast('success', 'Institution deleted')
     navigate('/institutions')
+  }
+
+  async function handleRunAnalysis() {
+    if (!institution) return
+    setAnalysisRunning(true)
+    setActiveTab('insights')
+    try {
+      const result = await runFullAnalysis(institution.id, institution.name, setAnalysisStatus)
+      setInsightsRefreshKey((k) => k + 1)
+      if (result.proposedThemes.length > 0) {
+        setProposedThemes(result.proposedThemes)
+        setThemeModalOpen(true)
+      }
+      showToast('success', `Analysis complete — ${result.findings.length} findings generated`)
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Analysis failed')
+    } finally {
+      setAnalysisRunning(false)
+      setAnalysisStatus('')
+    }
   }
 
   if (!institution) return null
@@ -107,7 +135,14 @@ export function InstitutionDetail() {
               </div>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={handleRunAnalysis}
+              disabled={analysisRunning}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Sparkles size={14} /> {analysisRunning ? analysisStatus || 'Running…' : 'Run Full Analysis'}
+            </button>
             <button onClick={() => setEditOpen(true)}
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">
               <Pencil size={14} /> Edit
@@ -147,14 +182,20 @@ export function InstitutionDetail() {
         {activeTab === 'priorities' && <StrategicPrioritiesTab institutionId={institution.id} />}
         {activeTab === 'kpis' && <KPIsTab institutionId={institution.id} />}
         {activeTab === 'sustainability' && <SustainabilityTab institutionId={institution.id} />}
-        {activeTab === 'insights' && (
-          <p className="text-sm text-slate-400 text-center py-8">AI insights will be available in Phase 5.</p>
-        )}
+        {activeTab === 'insights' && <InsightsTab institutionId={institution.id} refreshKey={insightsRefreshKey} />}
       </div>
 
       <SlideOver open={editOpen} onClose={() => setEditOpen(false)} title="Edit Institution">
         <InstitutionForm institution={institution} onClose={() => { setEditOpen(false); loadInstitution() }} />
       </SlideOver>
+
+      {themeModalOpen && (
+        <ThemeProposalModal
+          institutionId={institution.id}
+          themes={proposedThemes}
+          onClose={() => setThemeModalOpen(false)}
+        />
+      )}
 
       <ConfirmDialog
         open={deleteOpen}
