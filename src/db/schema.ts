@@ -168,4 +168,15 @@ CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,
   value TEXT
 );
+
+INSERT OR IGNORE INTO themes (name, is_system) VALUES
+  ('Indigenization', 1),
+  ('Digital Transformation', 1),
+  ('Financial Sustainability', 1),
+  ('Research Excellence', 1),
+  ('Student Success', 1),
+  ('Sustainability & Climate', 1),
+  ('Enrolment Management', 1),
+  ('Internationalization', 1),
+  ('People & Culture', 1);
 `

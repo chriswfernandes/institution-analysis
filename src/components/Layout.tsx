@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -7,12 +7,12 @@ import {
   BarChart2,
   Settings,
   GraduationCap,
-  Search,
   ChevronLeft,
   ChevronRight,
   Database,
 } from 'lucide-react'
 import { ToastContainer } from './ToastContainer'
+import { GlobalSearch } from './GlobalSearch'
 import { useAppState } from '../context/AppContext'
 
 const NAV_ITEMS = [
@@ -23,10 +23,27 @@ const NAV_ITEMS = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
+const SIDEBAR_KEY = 'sidebar_collapsed'
+
 export function Layout() {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === 'true')
   const { dbReady } = useAppState()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    function onResize() {
+      if (window.innerWidth < 768) setCollapsed(true)
+    }
+    if (window.innerWidth < 768) setCollapsed(true)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  function toggleCollapsed() {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem(SIDEBAR_KEY, String(next))
+  }
 
   return (
     <div className="flex flex-col h-screen bg-slate-50">
@@ -41,10 +58,7 @@ export function Layout() {
           <span className={collapsed ? 'hidden' : ''}>HE Tracker</span>
         </button>
         <div className="flex-1 max-w-lg mx-auto">
-          <div className="flex items-center gap-2 bg-slate-700 rounded-lg px-3 py-1.5 text-slate-400 text-sm">
-            <Search size={14} />
-            <span>Search institutions, documents…</span>
-          </div>
+          <GlobalSearch />
         </div>
         <button
           onClick={() => navigate('/settings')}
@@ -90,7 +104,7 @@ export function Layout() {
               </div>
             )}
             <button
-              onClick={() => setCollapsed(!collapsed)}
+              onClick={toggleCollapsed}
               className="flex items-center justify-center w-full p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >

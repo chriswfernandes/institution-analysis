@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider, useAppDispatch } from './context/AppContext'
+import { ProcessingProvider } from './context/ProcessingContext'
 import { Layout } from './components/Layout'
 import { Dashboard } from './pages/Dashboard'
 import { Institutions } from './pages/Institutions'
 import { InstitutionDetail } from './pages/InstitutionDetail'
 import { Documents } from './pages/Documents'
 import { Analysis } from './pages/Analysis'
+import { ComparisonView } from './pages/ComparisonView'
 import { Settings } from './pages/Settings'
+import { ProcessingStatusBar } from './components/ProcessingStatusBar'
 import { initDb } from './db/db'
 import { GraduationCap } from 'lucide-react'
 
@@ -39,6 +42,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="institutions" element={<Institutions />} />
+        <Route path="institutions/compare" element={<ComparisonView />} />
         <Route path="institutions/:id" element={<InstitutionDetail />} />
         <Route path="documents" element={<Documents />} />
         <Route path="analysis" element={<Analysis />} />
@@ -74,9 +78,12 @@ function AppInner() {
 export default function App() {
   return (
     <AppProvider>
-      <BrowserRouter>
-        <AppInner />
-      </BrowserRouter>
+      <ProcessingProvider>
+        <BrowserRouter>
+          <AppInner />
+          <ProcessingStatusBar />
+        </BrowserRouter>
+      </ProcessingProvider>
     </AppProvider>
   )
 }
