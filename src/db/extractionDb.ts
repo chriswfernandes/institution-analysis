@@ -116,6 +116,14 @@ export function saveKeyFacts(
   saveDb()
 }
 
+export function clearExtractionsForDocument(documentId: number): void {
+  execute('DELETE FROM financial_summaries WHERE document_id = ?', [documentId])
+  execute('DELETE FROM strategic_priorities WHERE document_id = ?', [documentId])
+  execute('DELETE FROM sustainability_metrics WHERE document_id = ?', [documentId])
+  execute('DELETE FROM kpi_datapoints WHERE document_id = ?', [documentId])
+  saveDb()
+}
+
 // ── Manual entry upserts ────────────────────────────────────────────────────
 
 interface FinancialFormData {
