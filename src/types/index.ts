@@ -47,7 +47,7 @@ export interface ChunkRow {
 }
 
 export interface ClassificationResult {
-  documentType: 'Financial Statement' | 'Strategic Plan' | 'Sustainability Report' | 'Annual Report' | 'Other'
+  documentType: string
   fiscalYear: string | null
   institutionName: string | null
   confidence: number

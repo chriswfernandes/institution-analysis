@@ -13,6 +13,7 @@ import {
   saveSustainability,
   saveKeyFacts,
 } from '../db/extractionDb'
+import { getDocumentTypeConfig } from './documentTypeRegistry'
 import type { ClassificationResult } from '../types'
 import type { ProcessingStep } from '../context/ProcessingContext'
 
@@ -40,32 +41,25 @@ export async function runProcessingPipeline(
 
     onStepChange('extracting_data')
 
-    if (
-      confirmed.documentType === 'Financial Statement' ||
-      confirmed.documentType === 'Annual Report'
-    ) {
+    const config = getDocumentTypeConfig(confirmed.documentType)
+
+    if (config.extractors.includes('financials')) {
       const financials = await extractFinancials(chunks)
       saveFinancials(institutionId, documentId, financials)
     }
 
-    if (
-      confirmed.documentType === 'Strategic Plan' ||
-      confirmed.documentType === 'Annual Report'
-    ) {
+    if (config.extractors.includes('strategic')) {
       const strategic = await extractStrategicPriorities(chunks)
       saveStrategicPlan(institutionId, documentId, strategic)
     }
 
-    if (
-      confirmed.documentType === 'Sustainability Report' ||
-      confirmed.documentType === 'Annual Report'
-    ) {
+    if (config.extractors.includes('sustainability')) {
       const sustainability = await extractSustainability(chunks)
       saveSustainability(institutionId, documentId, sustainability)
     }
 
-    if (confirmed.documentType === 'Other') {
-      const keyFacts = await extractKeyFacts(chunks)
+    if (config.extractors.includes('keyFacts')) {
+      const keyFacts = await extractKeyFacts(chunks, config.keyFactsHint)
       saveKeyFacts(institutionId, documentId, keyFacts.facts)
     }
 
