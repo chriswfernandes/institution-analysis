@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Globe, Pencil, Trash2, FileText, BarChart2, Leaf, Target, TrendingUp, Lightbulb, LayoutDashboard, Sparkles } from 'lucide-react'
+import { ArrowLeft, Globe, Pencil, Trash2, FileText, BarChart2, Leaf, Target, TrendingUp, Lightbulb, LayoutDashboard, Sparkles, Printer } from 'lucide-react'
 import { query, execute, saveDb } from '../db/db'
 import { useAppDispatch } from '../context/AppContext'
 import { useToast } from '../components/useToast'
@@ -139,9 +139,15 @@ export function InstitutionDetail() {
             <button
               onClick={handleRunAnalysis}
               disabled={analysisRunning}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed no-print"
             >
               <Sparkles size={14} /> {analysisRunning ? analysisStatus || 'Running…' : 'Run Full Analysis'}
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 no-print"
+            >
+              <Printer size={14} /> Print Report
             </button>
             <button onClick={() => setEditOpen(true)}
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">
@@ -156,7 +162,7 @@ export function InstitutionDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="relative border-b border-slate-200 mb-4">
+      <div className="relative border-b border-slate-200 mb-4 no-print">
         <div className="flex gap-1 overflow-x-auto scrollbar-hide -mb-px">
           {TABS.map(({ key, label, icon: Icon }) => (
             <button
@@ -176,15 +182,15 @@ export function InstitutionDetail() {
         </div>
       </div>
 
-      {/* Tab content */}
+      {/* Tab content — all panels mounted; inactive ones hidden via CSS (visible in print) */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
-        {activeTab === 'overview' && <OverviewTab institutionId={institution.id} />}
-        {activeTab === 'documents' && <DocumentsTab institutionId={institution.id} />}
-        {activeTab === 'financials' && <FinancialsTab institutionId={institution.id} />}
-        {activeTab === 'priorities' && <StrategicPrioritiesTab institutionId={institution.id} />}
-        {activeTab === 'kpis' && <KPIsTab institutionId={institution.id} />}
-        {activeTab === 'sustainability' && <SustainabilityTab institutionId={institution.id} />}
-        {activeTab === 'insights' && <InsightsTab institutionId={institution.id} refreshKey={insightsRefreshKey} />}
+        <div className={activeTab === 'overview' ? '' : 'hidden'}><OverviewTab institutionId={institution.id} /></div>
+        <div className={activeTab === 'documents' ? '' : 'hidden'}><DocumentsTab institutionId={institution.id} /></div>
+        <div className={activeTab === 'financials' ? '' : 'hidden'}><FinancialsTab institutionId={institution.id} /></div>
+        <div className={activeTab === 'priorities' ? '' : 'hidden'}><StrategicPrioritiesTab institutionId={institution.id} /></div>
+        <div className={activeTab === 'kpis' ? '' : 'hidden'}><KPIsTab institutionId={institution.id} /></div>
+        <div className={activeTab === 'sustainability' ? '' : 'hidden'}><SustainabilityTab institutionId={institution.id} /></div>
+        <div className={activeTab === 'insights' ? '' : 'hidden'}><InsightsTab institutionId={institution.id} refreshKey={insightsRefreshKey} /></div>
       </div>
 
       <SlideOver open={editOpen} onClose={() => setEditOpen(false)} title="Edit Institution">

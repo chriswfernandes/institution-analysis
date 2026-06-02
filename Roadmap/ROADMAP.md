@@ -184,4 +184,43 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 
 ---
 
+## Phase 11 — Document Type Registry
+**File:** `PRP_Phase11_Document_Type_Registry.md`
+
+*Replaces hardcoded if/else extraction routing with a config-driven registry of 8 document types. Fixes the gap where Annual Reports never populated kpi_datapoints. Adds Enrolment Report and Budget Submission as first-class types.*
+
+- [ ] `src/services/documentTypeRegistry.ts`: registry with 8 types, each declaring extractors[] and keyFactsHint
+- [ ] `processingPipeline.ts`: reads from registry instead of if/else blocks
+- [ ] `aiService.ts`: `extractKeyFacts()` accepts optional `hint` param injected into prompt
+- [ ] `ClassificationConfirmModal`: dropdown populated from registry; shows "Will populate: ..." for selected type
+- [ ] `ClassificationResult.documentType` widened to `string` in types
+
+---
+
+## Phase 12 — Re-process Guard
+**File:** `PRP_Phase12_Reprocess_Guard.md`
+
+*Makes extraction writes idempotent: re-processing a document replaces existing rows rather than duplicating them. Adds a low-confidence warning banner in the classification confirmation modal.*
+
+- [ ] `extractionDb.ts`: all four save functions DELETE existing rows for document_id before INSERT
+- [ ] `processingPipeline.ts`: attaches `lowConfidence: true` when `confidence < 0.6`
+- [ ] `ClassificationResult` type: add `lowConfidence?: boolean`
+- [ ] `ClassificationConfirmModal`: amber warning banner when `lowConfidence` is true
+- [ ] `DocumentDetailPanel.tsx`: re-process confirm message updated to mention data replacement
+
+---
+
+## Phase 13 — Extraction Review UI
+**File:** `PRP_Phase13_Extraction_Review_UI.md`
+
+*Adds an "Extracted Data" panel inside the Document Detail slide-over showing every row the pipeline wrote, with per-row delete and a "Clear All Extractions" bulk action.*
+
+- [ ] `DocumentDetailPanel.tsx`: collapsible "Extracted Data" section queries all four extraction tables by document_id
+- [ ] Per-row ✕ delete with toast; reloads summary after each delete
+- [ ] "Clear All Extractions" button with ConfirmDialog
+- [ ] `extractionDb.ts`: new `clearExtractionsForDocument(documentId)` helper
+- [ ] Section only shown when `processing_status === 'processed'`
+
+---
+
 *Each PRP file is a self-contained prompt. Feed it to Claude along with the existing codebase to implement that phase.*

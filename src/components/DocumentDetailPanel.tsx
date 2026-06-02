@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { SlideOver } from './SlideOver'
 import { ConfirmDialog } from './ConfirmDialog'
 import { StatusBadge } from './StatusBadge'
@@ -9,6 +10,14 @@ import { useAppDispatch } from '../context/AppContext'
 import { useToast } from './useToast'
 import { runProcessingPipeline } from '../services/processingPipeline'
 import { runQuickInsights } from '../services/analysisPipeline'
+import {
+  deleteFinancialSummary,
+  deleteStrategicPriority,
+  deleteSustainabilityMetric,
+  deleteKpiDatapoint,
+  clearExtractionsForDocument,
+} from '../db/extractionDb'
+import { query } from '../db/db'
 import type { DocumentRow, ChunkRow, ClassificationResult } from '../types'
 
 interface Props {
@@ -21,6 +30,22 @@ interface PendingConfirm {
   resolve: (confirmed: ClassificationResult | null) => void
 }
 
+interface ExtractionSummary {
+  financials: { id: number; fiscal_year: string | null }[]
+  priorities: { id: number; priority_name: string }[]
+  sustainability: { id: number; fiscal_year: string | null }[]
+  kpis: { id: number; kpi_name: string; kpi_category: string | null; fiscal_year: string | null }[]
+}
+
+function getExtractionSummary(documentId: number): ExtractionSummary {
+  return {
+    financials: query('SELECT id, fiscal_year FROM financial_summaries WHERE document_id = ?', [documentId]),
+    priorities: query('SELECT id, priority_name FROM strategic_priorities WHERE document_id = ?', [documentId]),
+    sustainability: query('SELECT id, fiscal_year FROM sustainability_metrics WHERE document_id = ?', [documentId]),
+    kpis: query('SELECT id, kpi_name, kpi_category, fiscal_year FROM kpi_datapoints WHERE document_id = ?', [documentId]),
+  }
+}
+
 export function DocumentDetailPanel({ documentId, onClose }: Props) {
   const dispatch = useAppDispatch()
   const showToast = useToast()
@@ -29,15 +54,30 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
   const [showText, setShowText] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmReprocess, setConfirmReprocess] = useState(false)
+  const [confirmClearAll, setConfirmClearAll] = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null)
+  const [extraction, setExtraction] = useState<ExtractionSummary | null>(null)
+  const [extractionOpen, setExtractionOpen] = useState(true)
 
   useEffect(() => {
-    if (documentId === null) { setDoc(null); setChunks([]); return }
+    if (documentId === null) { setDoc(null); setChunks([]); setExtraction(null); return }
     setDoc(getDocument(documentId))
     setChunks(getChunks(documentId))
     setShowText(false)
   }, [documentId])
+
+  useEffect(() => {
+    if (documentId !== null && doc?.processing_status === 'processed') {
+      setExtraction(getExtractionSummary(documentId))
+    } else {
+      setExtraction(null)
+    }
+  }, [documentId, doc?.processing_status])
+
+  function reloadExtraction() {
+    if (documentId !== null) setExtraction(getExtractionSummary(documentId))
+  }
 
   function refreshDoc() {
     if (documentId === null) return
@@ -70,6 +110,7 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
         (result) => waitForConfirmation(result)
       )
       refreshDoc()
+      reloadExtraction()
       showToast('success', `${doc.filename} re-processed successfully`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -97,8 +138,22 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
     }
   }
 
+  function handleClearAll() {
+    if (!documentId) return
+    clearExtractionsForDocument(documentId)
+    reloadExtraction()
+    showToast('success', 'All extracted data cleared for this document')
+  }
+
   const canReprocess =
     doc?.processing_status === 'failed' || doc?.processing_status === 'processed'
+
+  const hasExtractions = extraction && (
+    extraction.financials.length > 0 ||
+    extraction.priorities.length > 0 ||
+    extraction.sustainability.length > 0 ||
+    extraction.kpis.length > 0
+  )
 
   return (
     <>
@@ -157,6 +212,100 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
               </button>
             </div>
 
+            {/* Extracted Data section */}
+            {extraction !== null && (
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setExtractionOpen((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-sm font-medium text-slate-700"
+                >
+                  <span>Extracted Data</span>
+                  {extractionOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+
+                {extractionOpen && (
+                  <div className="px-4 py-3 space-y-4">
+                    {!hasExtractions && (
+                      <p className="text-xs text-slate-400">No extracted data for this document.</p>
+                    )}
+
+                    {extraction.financials.length > 0 && (
+                      <ExtractionGroup
+                        label="Financial Summaries"
+                        count={extraction.financials.length}
+                        rows={extraction.financials.map((r) => ({
+                          id: r.id,
+                          label: `FY ${r.fiscal_year ?? '—'}`,
+                        }))}
+                        onDelete={(id) => {
+                          deleteFinancialSummary(id)
+                          reloadExtraction()
+                          showToast('success', `Financial summary deleted`)
+                        }}
+                      />
+                    )}
+
+                    {extraction.priorities.length > 0 && (
+                      <ExtractionGroup
+                        label="Strategic Priorities"
+                        count={extraction.priorities.length}
+                        rows={extraction.priorities.map((r) => ({
+                          id: r.id,
+                          label: r.priority_name,
+                        }))}
+                        onDelete={(id) => {
+                          deleteStrategicPriority(id)
+                          reloadExtraction()
+                          showToast('success', `Strategic priority deleted`)
+                        }}
+                      />
+                    )}
+
+                    {extraction.sustainability.length > 0 && (
+                      <ExtractionGroup
+                        label="Sustainability Metrics"
+                        count={extraction.sustainability.length}
+                        rows={extraction.sustainability.map((r) => ({
+                          id: r.id,
+                          label: `FY ${r.fiscal_year ?? '—'}`,
+                        }))}
+                        onDelete={(id) => {
+                          deleteSustainabilityMetric(id)
+                          reloadExtraction()
+                          showToast('success', `Sustainability metric deleted`)
+                        }}
+                      />
+                    )}
+
+                    {extraction.kpis.length > 0 && (
+                      <ExtractionGroup
+                        label="KPI Datapoints"
+                        count={extraction.kpis.length}
+                        rows={extraction.kpis.map((r) => ({
+                          id: r.id,
+                          label: [r.kpi_name, r.kpi_category, r.fiscal_year].filter(Boolean).join(' · '),
+                        }))}
+                        onDelete={(id) => {
+                          deleteKpiDatapoint(id)
+                          reloadExtraction()
+                          showToast('success', `KPI datapoint deleted`)
+                        }}
+                      />
+                    )}
+
+                    {hasExtractions && (
+                      <button
+                        onClick={() => setConfirmClearAll(true)}
+                        className="text-xs text-red-500 hover:text-red-700 hover:underline mt-1"
+                      >
+                        Clear All Extractions
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Raw text toggle */}
             {chunks.length > 0 && (
               <div>
@@ -190,11 +339,21 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
       <ConfirmDialog
         open={confirmReprocess}
         title="Re-process Document"
-        message="This will overwrite existing extracted data for this document. Continue?"
+        message="This will replace all existing extracted data for this document (financials, priorities, KPIs, sustainability). Continue?"
         confirmLabel="Re-process"
         danger={false}
         onConfirm={() => { setConfirmReprocess(false); handleReprocess() }}
         onCancel={() => setConfirmReprocess(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmClearAll}
+        title="Clear All Extractions"
+        message="This will delete all financials, priorities, sustainability metrics, and KPI datapoints extracted from this document. This cannot be undone."
+        confirmLabel="Clear All"
+        danger
+        onConfirm={() => { setConfirmClearAll(false); handleClearAll() }}
+        onCancel={() => setConfirmClearAll(false)}
       />
 
       {pendingConfirm && (
@@ -213,6 +372,40 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
         />
       )}
     </>
+  )
+}
+
+function ExtractionGroup({
+  label,
+  count,
+  rows,
+  onDelete,
+}: {
+  label: string
+  count: number
+  rows: { id: number; label: string }[]
+  onDelete: (id: number) => void
+}) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-slate-500 mb-1.5">
+        {label} <span className="text-slate-400">({count})</span>
+      </p>
+      <ul className="space-y-1">
+        {rows.map((row) => (
+          <li key={row.id} className="flex items-center justify-between gap-2 text-xs text-slate-700">
+            <span className="truncate">{row.label}</span>
+            <button
+              onClick={() => onDelete(row.id)}
+              className="shrink-0 text-slate-400 hover:text-red-500 transition-colors"
+              title="Delete"
+            >
+              <Trash2 size={12} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

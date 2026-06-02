@@ -1,13 +1,6 @@
 import { useState, useEffect } from 'react'
+import { getDocumentTypeConfig, DOCUMENT_TYPE_LABELS } from '../services/documentTypeRegistry'
 import type { ClassificationResult } from '../types'
-
-const DOC_TYPES: ClassificationResult['documentType'][] = [
-  'Financial Statement',
-  'Strategic Plan',
-  'Sustainability Report',
-  'Annual Report',
-  'Other',
-]
 
 interface Props {
   open: boolean
@@ -29,6 +22,7 @@ export function ClassificationConfirmModal({ open, result, filename, onConfirm, 
   if (!open) return null
 
   const confidencePct = Math.round(result.confidence * 100)
+  const config = getDocumentTypeConfig(documentType)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -40,6 +34,12 @@ export function ClassificationConfirmModal({ open, result, filename, onConfirm, 
         <h2 className="text-lg font-semibold text-slate-900 mb-1">Document Classification</h2>
         <p className="text-sm text-slate-500 mb-5 truncate" title={filename}>{filename}</p>
 
+        {result.lowConfidence && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 mb-3">
+            ⚠ Low confidence ({Math.round((result.confidence ?? 0) * 100)}%) — please verify the document type before proceeding.
+          </div>
+        )}
+
         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
           AI classified this document as:
         </p>
@@ -49,13 +49,16 @@ export function ClassificationConfirmModal({ open, result, filename, onConfirm, 
             <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
             <select
               value={documentType}
-              onChange={(e) => setDocumentType(e.target.value as ClassificationResult['documentType'])}
+              onChange={(e) => setDocumentType(e.target.value)}
               className="input"
             >
-              {DOC_TYPES.map((t) => (
+              {DOCUMENT_TYPE_LABELS.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
+            <p className="text-xs text-slate-500 mt-1.5">
+              Will populate: <span className="font-medium">{config.targetTables.join(', ')}</span>
+            </p>
           </div>
 
           <div>

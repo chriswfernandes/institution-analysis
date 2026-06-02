@@ -292,12 +292,15 @@ ${chunk.chunk_text}
   return { ...merged, sustainabilityCertifications: certs }
 }
 
-export async function extractKeyFacts(chunks: ChunkRow[]): Promise<KeyFactsExtraction> {
+export async function extractKeyFacts(
+  chunks: ChunkRow[],
+  hint = 'Extract any quantitative facts or strategic statements relevant to a higher education consulting engagement.'
+): Promise<KeyFactsExtraction> {
   const allFacts: KeyFact[] = []
   const seenNames = new Set<string>()
 
   for (const chunk of chunks) {
-    const userMsg = `Extract key facts and data points from the following institutional document text. Focus on facts relevant to a consulting firm that advises Canadian post-secondary institutions.
+    const userMsg = `Extract key facts and data points from the following institutional document text. ${hint}
 
 Return a JSON object:
 {

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { ToastContainer } from './ToastContainer'
 import { GlobalSearch } from './GlobalSearch'
+import { ErrorBoundary } from './ErrorBoundary'
 import { useAppState } from '../context/AppContext'
 
 const NAV_ITEMS = [
@@ -115,7 +116,9 @@ export function Layout() {
 
         {/* Main content */}
         <main className={`${collapsed ? 'ml-14' : 'ml-56'} flex-1 overflow-auto p-6 transition-all duration-200`}>
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
 
