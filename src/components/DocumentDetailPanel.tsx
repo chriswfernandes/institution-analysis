@@ -190,7 +190,7 @@ export function DocumentDetailPanel({ documentId, onClose }: Props) {
       <ConfirmDialog
         open={confirmReprocess}
         title="Re-process Document"
-        message="This will overwrite existing extracted data for this document. Continue?"
+        message="This will replace all existing extracted data for this document (financials, priorities, KPIs, sustainability). Continue?"
         confirmLabel="Re-process"
         danger={false}
         onConfirm={() => { setConfirmReprocess(false); handleReprocess() }}

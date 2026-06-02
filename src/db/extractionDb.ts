@@ -11,6 +11,7 @@ export function saveFinancials(
   documentId: number,
   data: FinancialExtraction
 ): void {
+  execute('DELETE FROM financial_summaries WHERE document_id = ?', [documentId])
   execute(
     `INSERT INTO financial_summaries (
       institution_id, document_id, fiscal_year,
@@ -37,6 +38,8 @@ export function saveStrategicPlan(
   documentId: number,
   data: StrategicExtraction
 ): void {
+  execute('DELETE FROM strategic_priorities WHERE document_id = ?', [documentId])
+  execute('DELETE FROM strategic_plans WHERE document_id = ?', [documentId])
   execute(
     `INSERT INTO strategic_plans (
       institution_id, document_id, plan_name,
@@ -72,6 +75,7 @@ export function saveSustainability(
   documentId: number,
   data: SustainabilityExtraction
 ): void {
+  execute('DELETE FROM sustainability_metrics WHERE document_id = ?', [documentId])
   execute(
     `INSERT INTO sustainability_metrics (
       institution_id, document_id, fiscal_year,
@@ -96,6 +100,7 @@ export function saveKeyFacts(
   documentId: number,
   facts: KeyFact[]
 ): void {
+  execute('DELETE FROM kpi_datapoints WHERE document_id = ?', [documentId])
   for (const f of facts) {
     execute(
       `INSERT INTO kpi_datapoints (

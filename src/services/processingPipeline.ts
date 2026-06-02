@@ -30,7 +30,11 @@ export async function runProcessingPipeline(
     const classificationResult = await classifyDocument(chunks)
 
     onStepChange('awaiting_confirmation')
-    const confirmed = await onClassified(classificationResult)
+    const resultWithFlag = {
+      ...classificationResult,
+      lowConfidence: (classificationResult.confidence ?? 1) < 0.6,
+    }
+    const confirmed = await onClassified(resultWithFlag)
     if (!confirmed) throw new Error('Cancelled')
 
     updateDocumentClassification(

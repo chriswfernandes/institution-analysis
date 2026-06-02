@@ -51,6 +51,7 @@ export interface ClassificationResult {
   fiscalYear: string | null
   institutionName: string | null
   confidence: number
+  lowConfidence?: boolean
 }
 
 export interface FinancialExtraction {
