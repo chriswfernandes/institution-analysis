@@ -1,11 +1,43 @@
 import { useState, useEffect, useRef } from 'react'
-import { Eye, EyeOff, Plus, Trash2, Download, Upload, FlaskConical } from 'lucide-react'
+import { Eye, EyeOff, Plus, Trash2, Download, Upload, FlaskConical, FileUp } from 'lucide-react'
 import { getSetting, setSetting, exportDb, importDb, query, execute, saveDb } from '../db/db'
 import { getAllDocuments } from '../db/documentDb'
 import { useAppDispatch, useAppState } from '../context/AppContext'
 import { useToast } from '../components/useToast'
 import { testConnection } from '../services/aiService'
-import { seedDatabase } from '../db/seedData'
+import { seedDatabase, clearAndReseed } from '../db/seedData'
+import { downloadCsv } from '../utils/exportCsv'
+
+function parseCsvRows(text: string): Record<string, string>[] {
+  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
+  if (lines.length < 2) return []
+
+  const parseRow = (line: string): string[] => {
+    const fields: string[] = []
+    let cur = '', inQuote = false
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === '"') {
+        if (inQuote && line[i + 1] === '"') { cur += '"'; i++ }
+        else inQuote = !inQuote
+      } else if (ch === ',' && !inQuote) {
+        fields.push(cur.trim()); cur = ''
+      } else {
+        cur += ch
+      }
+    }
+    fields.push(cur.trim())
+    return fields
+  }
+
+  const headers = parseRow(lines[0]).map((h) => h.toLowerCase())
+  return lines.slice(1).map((line) => {
+    const vals = parseRow(line)
+    const row: Record<string, string> = {}
+    headers.forEach((h, i) => { row[h] = vals[i] ?? '' })
+    return row
+  })
+}
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import type { Tag, Institution } from '../types'
 
@@ -28,7 +60,9 @@ export function Settings() {
   const [newTagColour, setNewTagColour] = useState(PRESET_COLOURS[0])
 
   const importRef = useRef<HTMLInputElement>(null)
+  const importCsvRef = useRef<HTMLInputElement>(null)
   const [seedConfirmOpen, setSeedConfirmOpen] = useState(false)
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (!dbReady) return
@@ -91,6 +125,91 @@ export function Settings() {
     saveDb()
     loadTags()
     showToast('success', 'Tag deleted')
+  }
+
+  function handleDownloadTemplate() {
+    downloadCsv('institutions_template.csv', [
+      { name: 'University of British Columbia', short_code: 'UBC', province: 'BC', institution_type: 'University', website: 'https://www.ubc.ca', notes: '' },
+    ])
+  }
+
+  async function handleImportCsv(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (importCsvRef.current) importCsvRef.current.value = ''
+
+    const text = await file.text()
+    const rows = parseCsvRows(text)
+
+    if (rows.length === 0) {
+      showToast('error', 'CSV is empty or has no data rows')
+      return
+    }
+
+    const headers = Object.keys(rows[0])
+    const missing = ['name', 'short_code'].filter((h) => !headers.includes(h))
+    if (missing.length > 0) {
+      showToast('error', `CSV missing required columns: ${missing.join(', ')}`)
+      return
+    }
+
+    const existingCodes = new Set(
+      query<{ short_code: string }>('SELECT short_code FROM institutions').map((r) => r.short_code.toUpperCase())
+    )
+
+    let imported = 0
+    const skipped: string[] = []
+
+    for (const row of rows) {
+      const name = row['name']?.trim()
+      const short_code = row['short_code']?.trim()
+
+      if (!name || !short_code) { skipped.push(short_code || '(empty)'); continue }
+      if (!/^[A-Z0-9\-]+$/i.test(short_code)) { skipped.push(short_code); continue }
+      if (existingCodes.has(short_code.toUpperCase())) { skipped.push(short_code.toUpperCase()); continue }
+
+      execute(
+        'INSERT INTO institutions (name, short_code, province, institution_type, website, notes) VALUES (?, ?, ?, ?, ?, ?)',
+        [name, short_code.toUpperCase(), row['province'] || null, row['institution_type'] || null, row['website'] || null, row['notes'] || null]
+      )
+      existingCodes.add(short_code.toUpperCase())
+      imported++
+    }
+
+    if (imported > 0) saveDb()
+
+    const freshInstitutions = query<Institution>(
+      `SELECT i.*, COUNT(d.id) as document_count FROM institutions i
+       LEFT JOIN documents d ON d.institution_id = i.id
+       GROUP BY i.id ORDER BY i.name`
+    )
+    dispatch({ type: 'SET_INSTITUTIONS', payload: freshInstitutions })
+
+    if (imported === 0) {
+      showToast('error', `No institutions imported — all short codes already exist`)
+    } else if (skipped.length === 0) {
+      showToast('success', `${imported} institution${imported !== 1 ? 's' : ''} imported successfully`)
+    } else {
+      showToast('info', `${imported} imported, ${skipped.length} skipped (duplicate short codes: ${skipped.join(', ')})`)
+    }
+  }
+
+  function handleReset() {
+    try {
+      clearAndReseed()
+      const institutions = query<Institution>(
+        `SELECT i.*, COUNT(d.id) as document_count FROM institutions i
+         LEFT JOIN documents d ON d.institution_id = i.id
+         GROUP BY i.id ORDER BY i.name`
+      )
+      dispatch({ type: 'SET_INSTITUTIONS', payload: institutions })
+      const freshTags = query<Tag>('SELECT * FROM tags ORDER BY name')
+      dispatch({ type: 'SET_TAGS', payload: freshTags })
+      dispatch({ type: 'SET_DOCUMENTS', payload: getAllDocuments() })
+      showToast('success', 'Database reset — sample data reloaded')
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Reset failed')
+    }
   }
 
   function handleSeedData() {
@@ -180,6 +299,29 @@ export function Settings() {
         </div>
       </section>
 
+      {/* Bulk Import */}
+      <section className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-base font-semibold text-slate-900 mb-1">Bulk Institution Import</h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Import multiple institutions at once from a CSV file. Download the template to see the required format.
+        </p>
+        <div className="flex gap-3 flex-wrap">
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
+          >
+            <Download size={14} /> Download CSV Template
+          </button>
+          <button
+            onClick={() => importCsvRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
+          >
+            <FileUp size={14} /> Import Institutions from CSV
+          </button>
+          <input ref={importCsvRef} type="file" accept=".csv" className="hidden" aria-label="Import institutions CSV" onChange={handleImportCsv} />
+        </div>
+      </section>
+
       {/* Tag Management */}
       <section className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-base font-semibold text-slate-900 mb-4">Tag Management</h2>
@@ -247,6 +389,21 @@ export function Settings() {
         </button>
       </section>
 
+      {/* Danger zone */}
+      <section className="border border-red-200 rounded-xl p-6">
+        <h2 className="text-base font-semibold text-red-700 mb-1">Danger Zone</h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Deletes all institutions, documents, and extracted data, then reloads the UBC / U of T
+          sample dataset. This cannot be undone.
+        </p>
+        <button
+          onClick={() => setResetConfirmOpen(true)}
+          className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+        >
+          Reset to Sample Data
+        </button>
+      </section>
+
       <ConfirmDialog
         open={seedConfirmOpen}
         title="Load Sample Data"
@@ -255,6 +412,16 @@ export function Settings() {
         danger={false}
         onConfirm={() => { setSeedConfirmOpen(false); handleSeedData() }}
         onCancel={() => setSeedConfirmOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        title="Reset to Sample Data"
+        message="This will delete ALL institutions, documents, financials, KPIs, and strategic data, then reload the UBC / U of T sample dataset. This cannot be undone."
+        confirmLabel="Reset Database"
+        danger
+        onConfirm={() => { setResetConfirmOpen(false); handleReset() }}
+        onCancel={() => setResetConfirmOpen(false)}
       />
     </div>
   )

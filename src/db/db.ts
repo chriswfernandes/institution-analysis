@@ -1,5 +1,6 @@
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import { SCHEMA_SQL } from './schema'
+import { seedDatabase, backfillSeedData } from './seedData'
 
 const DB_KEY = 'he_tracker_db'
 let db: Database | null = null
@@ -18,6 +19,12 @@ export async function initDb(): Promise<void> {
   }
 
   db.run(SCHEMA_SQL)
+  const isNew = !saved
+  if (isNew) {
+    try { seedDatabase() } catch { /* non-fatal */ }
+  } else {
+    try { backfillSeedData() } catch { /* non-fatal */ }
+  }
   saveDb()
 }
 

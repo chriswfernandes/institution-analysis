@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Building2, BarChart2 } from 'lucide-react'
+import { Plus, Search, Building2, BarChart2, Download } from 'lucide-react'
 import { query, execute, saveDb } from '../db/db'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { SlideOver } from '../components/SlideOver'
@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { InstitutionForm } from '../components/InstitutionForm'
 import { useToast } from '../components/useToast'
 import type { Institution, Tag } from '../types'
+import { downloadCsv } from '../utils/exportCsv'
 
 export function Institutions() {
   const { institutions, tags, dbReady } = useAppState()
@@ -66,6 +67,14 @@ export function Institutions() {
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold text-slate-900">Institutions</h1>
         <div className="flex gap-2">
+          {institutions.length > 0 && (
+            <button
+              onClick={() => downloadCsv('institutions.csv', institutions.map(({ id, name, short_code, institution_type, province, website, notes }) => ({ id, name, short_code, institution_type, province, website, notes })))}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200"
+            >
+              <Download size={16} /> Export CSV
+            </button>
+          )}
           <button
             onClick={() => navigate('/institutions/compare')}
             className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200"
@@ -104,7 +113,11 @@ export function Institutions() {
           {filtered.map((inst) => {
             const instTags = tags.length > 0 ? getTagsForInstitution(inst.id) : []
             return (
-              <div key={inst.id} className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-3">
+              <div
+                key={inst.id}
+                onClick={() => navigate(`/institutions/${inst.id}`)}
+                className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-3 cursor-pointer hover:border-green-400 hover:shadow-sm transition-all"
+              >
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <h2 className="font-semibold text-slate-900 text-base leading-tight">{inst.name}</h2>
@@ -128,7 +141,7 @@ export function Institutions() {
 
                 <p className="text-xs text-slate-400">{inst.document_count ?? 0} document{inst.document_count !== 1 ? 's' : ''}</p>
 
-                <div className="flex gap-2 mt-auto pt-1">
+                <div className="flex gap-2 mt-auto pt-1" onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => navigate(`/institutions/${inst.id}`)}
                     className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
                     View

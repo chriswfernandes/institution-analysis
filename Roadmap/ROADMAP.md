@@ -102,4 +102,86 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 
 ---
 
+## Phase 7 — Manual Data Entry
+**File:** `PRP_Phase7_Manual_Data_Entry.md`
+
+*Enables full use of the app without an LLM API key. All four extracted-data tabs gain inline Add / Edit / Delete capability so users can enter and correct data by hand.*
+
+- [ ] `src/db/extractionDb.ts`: add `upsertFinancialSummary()`, `upsertStrategicPriority()`, `upsertKpiDatapoint()`, `upsertSustainabilityMetric()` and matching delete functions
+- [ ] Financials tab: `+ Add Entry` button opens slide-over form; pencil/trash icons on each YoY table row
+- [ ] Strategic Priorities tab: `+ Add Priority` button; edit/delete on each priority card
+- [ ] KPIs tab: `+ Add KPI` button; delete on each row
+- [ ] Sustainability tab: `+ Add Year` button; edit/delete on each data table row
+- [ ] All forms reuse `SlideOver` + `ConfirmDialog`; persist via `execute()` + `saveDb()`
+
+---
+
+## Phase 8 — CSV Export
+**File:** `PRP_Phase8_CSV_Export.md`
+
+*Enables users to pull data into Excel/PowerPoint for client deliverables without needing the binary `.db` file.*
+
+- [ ] `src/utils/exportCsv.ts`: shared `downloadCsv(filename, rows)` utility using Blob + URL.createObjectURL
+- [ ] "Export CSV" button on Financial tab → `{short_code}_financials.csv`
+- [ ] "Export CSV" button on KPIs tab (respects active filters) → `{short_code}_kpis.csv`
+- [ ] "Export CSV" button on Strategic Priorities tab → `{short_code}_priorities.csv`
+- [ ] "Export CSV" button on Sustainability tab → `{short_code}_sustainability.csv`
+- [ ] "Export CSV" button on Insights tab (current run) → `{short_code}_insights_{run_id}.csv`
+- [ ] "Export CSV" button on Institutions list → `institutions.csv`
+- [ ] "Export CSV" button on Comparison view → `comparison_{metric}_{date}.csv`
+- [ ] Error toast when table has no data to export
+
+---
+
+## Phase 8.1 — Institution Detail Tab Bar Scrollability
+**File:** `PRP_Phase8.1_Tab_Bar_Scrollability.md`
+
+*The 7-tab bar on Institution Detail clips on screens narrower than ~1100px, making Financials, KPIs, Strategic Priorities, and Sustainability unreachable.*
+
+- [ ] Outer div holds `border-b` (static, never clipped); inner div holds `overflow-x-auto -mb-px`
+- [ ] Each tab button gets `shrink-0` to prevent compression
+- [ ] Active-tab green underline remains flush with the border at all widths
+- [ ] `.scrollbar-hide` utility added to `src/index.css` if not already present
+- [ ] Verified at 768px: all 7 tabs scrollable and selectable
+
+---
+
+## Phase 8.2 — Sample Data Backfill
+**File:** `PRP_Phase8.2_Sample_Data_Backfill.md`
+
+*Users whose localStorage database pre-dates Phase 4.1 have UBC/U of T institutions but no financial, KPI, priority, or sustainability rows. The seed guard blocks a re-run. This phase adds an auto-backfill on startup and a Settings "Reset to Sample Data" escape hatch.*
+
+- [ ] `backfillSeedData()` in `seedData.ts` — checks COUNT per table per institution, inserts only missing rows
+- [ ] `clearAndReseed()` in `seedData.ts` — deletes all data tables, then runs `seedDatabase()`
+- [ ] `db.ts` calls `backfillSeedData()` after `initSchema()` on every page load (no-op if data present)
+- [ ] Settings page: "Reset to Sample Data" danger zone with ConfirmDialog → `clearAndReseed()` → toast + navigate
+
+---
+
+## Phase 9 — Bulk Institution Import
+**File:** `PRP_Phase9_Bulk_Import.md`
+
+*Allows users to load many institutions at once from a CSV spreadsheet instead of entering each one via the form.*
+
+- [ ] Settings → new "Bulk Import" section with "Download CSV Template" and "Import Institutions from CSV" buttons
+- [ ] CSV template downloads with headers: `name, short_code, province, institution_type, website, notes`
+- [ ] CSV parser handles quoted fields, missing optional columns, blank lines
+- [ ] Validation: required `name` + `short_code` fields; skip duplicate short codes
+- [ ] Result toast: "N imported, M skipped (short codes: ...)"
+- [ ] Imported institutions immediately appear in the Institutions page (global context refreshed)
+
+---
+
+## Phase 10 — Error Boundary & Print Report
+**File:** `PRP_Phase10_Error_Boundary_and_Print.md`
+
+*Two hardening items: crash recovery so the app never goes fully blank, and a print stylesheet for shareable institution reports.*
+
+- [ ] `src/components/ErrorBoundary.tsx`: class component with fallback UI and "Reload page" button; wraps `<Outlet />` in Layout
+- [ ] Institution detail: all tab panels rendered in DOM simultaneously, inactive ones hidden via CSS (`hidden print:block`)
+- [ ] `src/index.css`: `@media print` block hides sidebar/header/nav, shows all tab panels, fixes Recharts SVG sizing
+- [ ] "Print Report" button added to institution header (calls `window.print()`; hidden in print output)
+
+---
+
 *Each PRP file is a self-contained prompt. Feed it to Claude along with the existing codebase to implement that phase.*
