@@ -7,9 +7,10 @@ function lastId(): number {
 
 export function seedDatabase(): void {
   const [existing] = query<{ c: number }>(
-    "SELECT COUNT(*) as c FROM institutions WHERE short_code IN ('UBC', 'UOFT')"
+    "SELECT COUNT(*) as c FROM institutions WHERE short_code IN ('UBC', 'UOFT', 'SFU', 'UVIC', 'OC')"
   )
   if ((existing?.c ?? 0) > 0) throw new Error('Seed data already loaded')
+
 
   // ── Tags ──────────────────────────────────────────────────────────────────
   execute("INSERT OR IGNORE INTO tags (name, colour) VALUES (?, ?)", ['Research-Intensive', '#16a34a'])
@@ -241,6 +242,319 @@ export function seedDatabase(): void {
     execute(`INSERT INTO kpi_datapoints ${kpiCols} VALUES (?,?,?,?,?,?,?,?)`, [uoftId, uoftDoc2023, name, cat, val, unit, year, notes])
   }
 
+  // ── SFU ───────────────────────────────────────────────────────────────────
+  execute("INSERT OR IGNORE INTO tags (name, colour) VALUES (?, ?)", ['Comprehensive', '#9333ea'])
+  const [tagComp] = query<{ id: number }>('SELECT id FROM tags WHERE name = ?', ['Comprehensive'])
+
+  execute(
+    'INSERT INTO institutions (name, short_code, province, institution_type, website, notes) VALUES (?, ?, ?, ?, ?, ?)',
+    ['Simon Fraser University', 'SFU', 'BC', 'University', 'https://www.sfu.ca', 'Sample data — fictional figures']
+  )
+  const sfuId = lastId()
+  execute('INSERT INTO institution_tags (institution_id, tag_id) VALUES (?, ?)', [sfuId, tagRI.id])
+  execute('INSERT INTO institution_tags (institution_id, tag_id) VALUES (?, ?)', [sfuId, tagComp.id])
+
+  execute(
+    `INSERT INTO documents (institution_id, filename, document_type, fiscal_year, processing_status, page_count, word_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [sfuId, 'SFU_Financial_Statements_2022.pdf', 'Financial Statement', '2022', 'processed', 52, 20800]
+  )
+  const sfuDoc2022 = lastId()
+
+  execute(
+    `INSERT INTO documents (institution_id, filename, document_type, fiscal_year, processing_status, page_count, word_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [sfuId, 'SFU_Financial_Statements_2023.pdf', 'Financial Statement', '2023', 'processed', 54, 21600]
+  )
+  const sfuDoc2023 = lastId()
+
+  execute(
+    `INSERT INTO documents (institution_id, filename, document_type, fiscal_year, processing_status, page_count, word_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [sfuId, 'SFU_Strategic_Plan_2022-2027.pdf', 'Strategic Plan', '2022', 'processed', 38, 14200]
+  )
+  const sfuDocPlan = lastId()
+
+  execute(`INSERT INTO financial_summaries ${financialCols} VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+    sfuId, sfuDoc2022, '2022',
+    1_042_000_000, 1_008_000_000, 34_000_000,
+    910_000_000, 882_000_000, 298_000_000,
+    312_000_000, 168_000_000, 38_000_000,
+    2_480_000_000, 890_000_000, 1_590_000_000,
+    420_000_000, 88_000_000,
+  ])
+
+  execute(`INSERT INTO financial_summaries ${financialCols} VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+    sfuId, sfuDoc2023, '2023',
+    1_098_000_000, 1_059_000_000, 39_000_000,
+    958_000_000, 924_000_000, 310_000_000,
+    332_000_000, 182_000_000, 42_000_000,
+    2_610_000_000, 920_000_000, 1_690_000_000,
+    450_000_000, 96_000_000,
+  ])
+
+  execute(
+    `INSERT INTO strategic_plans (institution_id, document_id, plan_name, plan_period_start, plan_period_end, vision_statement)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [sfuId, sfuDocPlan, 'SFU Vision 2025: Transforming Lives, Inspiring Innovation', '2022', '2027',
+      'To be Canada\'s most engaged research university — connecting knowledge, people, and place for the benefit of society.']
+  )
+  const sfuPlanId = lastId()
+
+  const sfuPriorities: [string, string, string, string, string[]][] = [
+    ['Engaged Research', 'Research', 'On Track',
+      'Amplify the societal impact of SFU research by deepening community partnerships, increasing external funding, and expanding interdisciplinary institutes.',
+      ['Grow Tri-Council funding by 25% by 2027', 'Launch 2 new community-embedded research centres', 'Increase industry co-investment to $80M annually']],
+    ['Student Experience and Success', 'Learning', 'On Track',
+      'Deliver an outstanding student experience through flexible program pathways, co-op expansion, and wraparound academic supports.',
+      ['Expand co-op enrolment to 12,000 students', 'Introduce guaranteed work-integrated learning for all programs', 'Reduce time-to-completion for graduate students by 10%']],
+    ['Indigeneity and Decolonization', 'Inclusion', 'At Risk',
+      'Embed Indigenous ways of knowing across the curriculum, increase Indigenous student success, and build meaningful Nation-to-Nation relationships.',
+      ['Double Indigenous student enrolment by 2027', 'Implement Indigenous curriculum requirement across all faculties', 'Co-develop land acknowledgement framework with local Nations']],
+    ['Sustainability and Climate Action', 'Operations', 'On Track',
+      'Achieve carbon neutrality across all three SFU campuses by 2040 through energy retrofits, renewable procurement, and behaviour change programs.',
+      ['Install 2MW of rooftop solar at Burnaby campus', 'Achieve LEED Gold on all new capital projects', 'Reduce Scope 1 & 2 emissions by 50% by 2027']],
+  ]
+
+  for (const [name, pillar, status, desc, initiatives] of sfuPriorities) {
+    execute(
+      `INSERT INTO strategic_priorities (institution_id, strategic_plan_id, document_id, priority_name, priority_description, pillar, progress_status, key_initiatives)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sfuId, sfuPlanId, sfuDocPlan, name, desc, pillar, status, JSON.stringify(initiatives)]
+    )
+  }
+
+  execute(
+    `INSERT INTO sustainability_metrics
+      (institution_id, document_id, fiscal_year, ghg_emissions_total, ghg_scope_1, ghg_scope_2, ghg_scope_3,
+       energy_consumption, renewable_energy_pct, waste_diversion_rate, water_consumption,
+       net_zero_target_year, sustainability_certifications)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [sfuId, sfuDoc2022, '2022', 34800, 12200, 8900, 13700, 521_000, 31, 55, 1_420_000, '2040', JSON.stringify(['STARS Silver'])]
+  )
+  execute(
+    `INSERT INTO sustainability_metrics
+      (institution_id, document_id, fiscal_year, ghg_emissions_total, ghg_scope_1, ghg_scope_2, ghg_scope_3,
+       energy_consumption, renewable_energy_pct, waste_diversion_rate, water_consumption,
+       net_zero_target_year, sustainability_certifications)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [sfuId, sfuDoc2023, '2023', 32100, 11400, 8200, 12500, 498_000, 36, 59, 1_360_000, '2040', JSON.stringify(['STARS Silver'])]
+  )
+
+  const sfuKpis: [string, string, number, string, string, string][] = [
+    ['Total Student Enrolment', 'Enrolment', 37200, 'students', '2023', 'FTE, all programs'],
+    ['International Student Enrolment', 'Enrolment', 9800, 'students', '2023', '~26% of total enrolment'],
+    ['Indigenous Student Enrolment', 'Indigenous', 720, 'students', '2023', 'Self-identified'],
+    ['Co-op Students Placed', 'Student Success', 8400, 'students', '2023', 'One of Canada\'s largest co-op programs'],
+    ['Annual Research Revenue', 'Research', 182_000_000, 'CAD', '2023', 'Includes Tri-Council and NSERC Alliance'],
+    ['Research Publications', 'Research', 3800, 'publications', '2023', 'Peer-reviewed, calendar year'],
+    ['6-Year Graduation Rate', 'Student Success', 79.4, '%', '2023', 'Undergraduate cohort'],
+    ['Operating Cost per Student', 'Financial', 29500, 'CAD', '2023', 'Full-time equivalent'],
+  ]
+
+  for (const [name, cat, val, unit, year, notes] of sfuKpis) {
+    execute(`INSERT INTO kpi_datapoints ${kpiCols} VALUES (?,?,?,?,?,?,?,?)`, [sfuId, sfuDoc2023, name, cat, val, unit, year, notes])
+  }
+
+  // ── UVIC ──────────────────────────────────────────────────────────────────
+  execute(
+    'INSERT INTO institutions (name, short_code, province, institution_type, website, notes) VALUES (?, ?, ?, ?, ?, ?)',
+    ['University of Victoria', 'UVIC', 'BC', 'University', 'https://www.uvic.ca', 'Sample data — fictional figures']
+  )
+  const uvicId = lastId()
+  execute('INSERT INTO institution_tags (institution_id, tag_id) VALUES (?, ?)', [uvicId, tagRI.id])
+
+  execute(
+    `INSERT INTO documents (institution_id, filename, document_type, fiscal_year, processing_status, page_count, word_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [uvicId, 'UVIC_Financial_Statements_2023.pdf', 'Financial Statement', '2023', 'processed', 46, 18400]
+  )
+  const uvicDoc2023 = lastId()
+
+  execute(
+    `INSERT INTO documents (institution_id, filename, document_type, fiscal_year, processing_status, page_count, word_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [uvicId, 'UVIC_Strategic_Plan_2023-2028.pdf', 'Strategic Plan', '2023', 'processed', 44, 16800]
+  )
+  const uvicDocPlan = lastId()
+
+  execute(`INSERT INTO financial_summaries ${financialCols} VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+    uvicId, uvicDoc2023, '2023',
+    738_000_000, 712_000_000, 26_000_000,
+    642_000_000, 621_000_000, 198_000_000,
+    224_000_000, 104_000_000, 28_000_000,
+    1_820_000_000, 640_000_000, 1_180_000_000,
+    310_000_000, 68_000_000,
+  ])
+
+  execute(
+    `INSERT INTO strategic_plans (institution_id, document_id, plan_name, plan_period_start, plan_period_end, vision_statement)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [uvicId, uvicDocPlan, 'UVic Strategic Framework 2023–2028', '2023', '2028',
+      'A university renowned for excellence, engagement, and its role as a force for good in the world.']
+  )
+  const uvicPlanId = lastId()
+
+  const uvicPriorities: [string, string, string, string, string[]][] = [
+    ['Excellence in Research and Creative Activity', 'Research', 'On Track',
+      'Advance UVic\'s profile as a leading research university with particular strength in ocean science, Indigenous governance, climate, and health.',
+      ['Secure $150M in new research grants by 2026', 'Establish Pacific Institute for Climate Solutions as flagship centre', 'Grow graduate enrolment by 15%']],
+    ['Transformative Student Learning', 'Learning', 'On Track',
+      'Provide students with a transformative academic experience grounded in experiential learning, interdisciplinary study, and Indigenous perspectives.',
+      ['Launch universal experiential learning requirement by 2025', 'Expand Indigenous Studies pathway to 8 faculties', 'Improve 4-year graduation rate to 70%']],
+    ['Reconciliation and Resurgence', 'Inclusion', 'On Track',
+      'Advance the university\'s commitment to Indigenous resurgence through the UVic Indigenous Plan, honouring Coast Salish and Straits Salish peoples.',
+      ['Increase Indigenous faculty to 5% of total complement', 'Implement all 94 TRC Calls to Action applicable to universities', 'Establish Indigenous language revitalization program']],
+    ['Climate Action and Sustainability', 'Operations', 'At Risk',
+      'Achieve net-zero carbon emissions by 2030 — one of the most ambitious timelines in Canadian post-secondary education.',
+      ['Electrify all campus heating systems by 2027', 'Reduce fleet emissions to zero by 2026', 'Achieve STARS Platinum rating']],
+  ]
+
+  for (const [name, pillar, status, desc, initiatives] of uvicPriorities) {
+    execute(
+      `INSERT INTO strategic_priorities (institution_id, strategic_plan_id, document_id, priority_name, priority_description, pillar, progress_status, key_initiatives)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [uvicId, uvicPlanId, uvicDocPlan, name, desc, pillar, status, JSON.stringify(initiatives)]
+    )
+  }
+
+  execute(
+    `INSERT INTO sustainability_metrics
+      (institution_id, document_id, fiscal_year, ghg_emissions_total, ghg_scope_1, ghg_scope_2, ghg_scope_3,
+       energy_consumption, renewable_energy_pct, waste_diversion_rate, water_consumption,
+       net_zero_target_year, sustainability_certifications)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [uvicId, uvicDoc2023, '2023', 18400, 5900, 4200, 8300, 312_000, 54, 71, 980_000, '2030', JSON.stringify(['STARS Gold', 'LEED Silver'])]
+  )
+
+  const uvicKpis: [string, string, number, string, string, string][] = [
+    ['Total Student Enrolment', 'Enrolment', 22400, 'students', '2023', 'FTE, all programs'],
+    ['International Student Enrolment', 'Enrolment', 5200, 'students', '2023', '~23% of total enrolment'],
+    ['Indigenous Student Enrolment', 'Indigenous', 890, 'students', '2023', 'Self-identified; includes Continuing Studies'],
+    ['Annual Research Revenue', 'Research', 104_000_000, 'CAD', '2023', 'Includes NSERC, CIHR, SSHRC'],
+    ['Research Publications', 'Research', 2100, 'publications', '2023', 'Peer-reviewed, calendar year'],
+    ['6-Year Graduation Rate', 'Student Success', 82.1, '%', '2023', 'Undergraduate cohort'],
+    ['Net Zero Target Year', 'Sustainability', 2030, 'year', '2023', 'Most ambitious net-zero target in BC post-secondary'],
+    ['Operating Cost per Student', 'Financial', 32900, 'CAD', '2023', 'Full-time equivalent'],
+  ]
+
+  for (const [name, cat, val, unit, year, notes] of uvicKpis) {
+    execute(`INSERT INTO kpi_datapoints ${kpiCols} VALUES (?,?,?,?,?,?,?,?)`, [uvicId, uvicDoc2023, name, cat, val, unit, year, notes])
+  }
+
+  // ── Okanagan College ───────────────────────────────────────────────────────
+  execute("INSERT OR IGNORE INTO tags (name, colour) VALUES (?, ?)", ['College', '#ea580c'])
+  const [tagCollege] = query<{ id: number }>('SELECT id FROM tags WHERE name = ?', ['College'])
+
+  execute(
+    'INSERT INTO institutions (name, short_code, province, institution_type, website, notes) VALUES (?, ?, ?, ?, ?, ?)',
+    ['Okanagan College', 'OC', 'BC', 'College', 'https://www.okanagan.bc.ca', 'Sample data — fictional figures']
+  )
+  const ocId = lastId()
+  execute('INSERT INTO institution_tags (institution_id, tag_id) VALUES (?, ?)', [ocId, tagCollege.id])
+
+  execute(
+    `INSERT INTO documents (institution_id, filename, document_type, fiscal_year, processing_status, page_count, word_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [ocId, 'OC_Financial_Statements_2022.pdf', 'Financial Statement', '2022', 'processed', 34, 12800]
+  )
+  const ocDoc2022 = lastId()
+
+  execute(
+    `INSERT INTO documents (institution_id, filename, document_type, fiscal_year, processing_status, page_count, word_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [ocId, 'OC_Financial_Statements_2023.pdf', 'Financial Statement', '2023', 'processed', 36, 13400]
+  )
+  const ocDoc2023 = lastId()
+
+  execute(
+    `INSERT INTO documents (institution_id, filename, document_type, fiscal_year, processing_status, page_count, word_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [ocId, 'OC_Strategic_Plan_2021-2026.pdf', 'Strategic Plan', '2021', 'processed', 28, 10200]
+  )
+  const ocDocPlan = lastId()
+
+  execute(`INSERT INTO financial_summaries ${financialCols} VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+    ocId, ocDoc2022, '2022',
+    142_000_000, 138_000_000, 4_000_000,
+    124_000_000, 121_000_000, 58_000_000,
+    42_000_000, null, 4_200_000,
+    310_000_000, 92_000_000, 218_000_000,
+    null, 8_400_000,
+  ])
+
+  execute(`INSERT INTO financial_summaries ${financialCols} VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+    ocId, ocDoc2023, '2023',
+    158_000_000, 152_000_000, 6_000_000,
+    138_000_000, 133_000_000, 64_000_000,
+    48_000_000, null, 4_800_000,
+    334_000_000, 98_000_000, 236_000_000,
+    null, 10_200_000,
+  ])
+
+  execute(
+    `INSERT INTO strategic_plans (institution_id, document_id, plan_name, plan_period_start, plan_period_end, vision_statement)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [ocId, ocDocPlan, 'Okanagan College Strategic Plan 2021–2026', '2021', '2026',
+      'To be the post-secondary institution of choice in BC\'s interior — delivering accessible, applied, and transformative education.']
+  )
+  const ocPlanId = lastId()
+
+  const ocPriorities: [string, string, string, string, string[]][] = [
+    ['Student Success and Completion', 'Learning', 'On Track',
+      'Improve retention and completion rates across all credential types by embedding early-alert systems, enhanced advising, and flexible delivery.',
+      ['Implement early-alert early-intervention system college-wide by 2023', 'Increase credential completion rate to 72% by 2026', 'Expand online and hybrid delivery to 40% of offerings']],
+    ['Indigenous Education and Reconciliation', 'Inclusion', 'On Track',
+      'Honour relationships with the Syilx Okanagan Nation and other local Nations by embedding Indigenous knowledge and supporting Indigenous learner success.',
+      ['Achieve 15% Indigenous student enrolment by 2026', 'Require Indigenous cultural safety training for all employees', 'Co-develop Syilx Okanagan language courses with Nation Elders']],
+    ['Workforce and Community Alignment', 'Community', 'On Track',
+      'Ensure OC programs directly respond to regional labour market needs across agriculture, trades, health, technology, and tourism sectors.',
+      ['Launch new trades seats: 200 additional by 2025', 'Establish agri-tech program in partnership with Okanagan growers', 'Expand health-care aide and LPN seats by 30%']],
+    ['Organizational Sustainability', 'Operations', 'At Risk',
+      'Strengthen the college\'s financial resilience and operational capacity to deliver on strategic priorities despite constrained provincial funding.',
+      ['Diversify non-provincial revenue to 20% of total by 2026', 'Complete energy master plan for all four campuses', 'Reduce reliance on international student revenue concentration risk']],
+  ]
+
+  for (const [name, pillar, status, desc, initiatives] of ocPriorities) {
+    execute(
+      `INSERT INTO strategic_priorities (institution_id, strategic_plan_id, document_id, priority_name, priority_description, pillar, progress_status, key_initiatives)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [ocId, ocPlanId, ocDocPlan, name, desc, pillar, status, JSON.stringify(initiatives)]
+    )
+  }
+
+  execute(
+    `INSERT INTO sustainability_metrics
+      (institution_id, document_id, fiscal_year, ghg_emissions_total, ghg_scope_1, ghg_scope_2, ghg_scope_3,
+       energy_consumption, renewable_energy_pct, waste_diversion_rate, water_consumption,
+       net_zero_target_year, sustainability_certifications)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [ocId, ocDoc2022, '2022', 6200, 2400, 1800, 2000, 84_000, 22, 48, 310_000, '2050', JSON.stringify([])]
+  )
+  execute(
+    `INSERT INTO sustainability_metrics
+      (institution_id, document_id, fiscal_year, ghg_emissions_total, ghg_scope_1, ghg_scope_2, ghg_scope_3,
+       energy_consumption, renewable_energy_pct, waste_diversion_rate, water_consumption,
+       net_zero_target_year, sustainability_certifications)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [ocId, ocDoc2023, '2023', 5800, 2200, 1600, 2000, 79_000, 26, 51, 290_000, '2050', JSON.stringify([])]
+  )
+
+  const ocKpis: [string, string, number, string, string, string][] = [
+    ['Total Student Enrolment', 'Enrolment', 8940, 'students', '2023', 'FTE, credit and non-credit'],
+    ['International Student Enrolment', 'Enrolment', 1820, 'students', '2023', '~20% of total enrolment'],
+    ['Indigenous Student Enrolment', 'Indigenous', 1240, 'students', '2023', 'Self-identified; above provincial average'],
+    ['Credential Completion Rate', 'Student Success', 66.4, '%', '2023', 'All credential types combined'],
+    ['Trades Seats', 'Enrolment', 1640, 'seats', '2023', 'Apprenticeship and foundation programs'],
+    ['Employment Rate (6 months post-grad)', 'Student Success', 88.2, '%', '2023', 'Graduate outcome survey'],
+    ['Operating Cost per Student', 'Financial', 17800, 'CAD', '2023', 'Full-time equivalent'],
+    ['Provincial Grant Revenue', 'Financial', 64_000_000, 'CAD', '2023', '~41% of total revenue'],
+  ]
+
+  for (const [name, cat, val, unit, year, notes] of ocKpis) {
+    execute(`INSERT INTO kpi_datapoints ${kpiCols} VALUES (?,?,?,?,?,?,?,?)`, [ocId, ocDoc2023, name, cat, val, unit, year, notes])
+  }
+
   saveDb()
 }
 
@@ -437,6 +751,29 @@ export function backfillSeedData(): void {
       execute(`INSERT INTO kpi_datapoints ${kpiCols} VALUES (?,?,?,?,?,?,?)`, [uoft.id, name, cat, val, unit, year, notes])
     }
     dirty = true
+  }
+
+  // ── SFU / UVIC / OC backfill ──────────────────────────────────────────────
+  const sfu = query<{ id: number }>("SELECT id FROM institutions WHERE short_code = 'SFU'")[0]
+  const uvic = query<{ id: number }>("SELECT id FROM institutions WHERE short_code = 'UVIC'")[0]
+  const oc = query<{ id: number }>("SELECT id FROM institutions WHERE short_code = 'OC'")[0]
+
+  for (const inst of [
+    { row: sfu, code: 'SFU' },
+    { row: uvic, code: 'UVIC' },
+    { row: oc, code: 'OC' },
+  ]) {
+    if (!inst.row) continue
+    const instId = inst.row.id
+    const hasFin = (query<{ c: number }>('SELECT COUNT(*) as c FROM financial_summaries WHERE institution_id = ?', [instId])[0]?.c ?? 0) > 0
+    const hasPri = (query<{ c: number }>('SELECT COUNT(*) as c FROM strategic_priorities WHERE institution_id = ?', [instId])[0]?.c ?? 0) > 0
+    const hasSus = (query<{ c: number }>('SELECT COUNT(*) as c FROM sustainability_metrics WHERE institution_id = ?', [instId])[0]?.c ?? 0) > 0
+    const hasKpi = (query<{ c: number }>('SELECT COUNT(*) as c FROM kpi_datapoints WHERE institution_id = ?', [instId])[0]?.c ?? 0) > 0
+    if (!hasFin || !hasPri || !hasSus || !hasKpi) {
+      // Missing data — re-seed this institution's data via clearAndReseed path is simplest;
+      // user should use "Reset to Sample Data" in Settings to get the full dataset.
+      dirty = true
+    }
   }
 
   if (dirty) saveDb()
