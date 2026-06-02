@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { Star, Lightbulb, AlertTriangle, TrendingUp, CheckCircle, AlertCircle, Clock } from 'lucide-react'
+import { Star, Lightbulb, AlertTriangle, TrendingUp, CheckCircle, AlertCircle, Clock, Download } from 'lucide-react'
 import { getAnalysisRuns, getFindingsByRun } from '../../db/analysisDb'
 import type { AnalysisRunRow, FindingRow } from '../../types'
+import { downloadCsv } from '../../utils/exportCsv'
 
 interface Props {
   institutionId: number
@@ -115,8 +116,16 @@ export function InsightsTab({ institutionId, refreshKey = 0 }: Props) {
     <div className="space-y-6">
       {/* Run history */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100">
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-slate-700">Analysis Run History</h3>
+          {findings.length > 0 && (
+            <button
+              onClick={() => downloadCsv('insights.csv', findings as unknown as Record<string, unknown>[])}
+              className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
+            >
+              <Download size={12} /> Export CSV
+            </button>
+          )}
         </div>
         <div className="divide-y divide-slate-100">
           {runs.map((run) => (

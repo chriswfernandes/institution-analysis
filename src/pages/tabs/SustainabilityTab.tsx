@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Download } from 'lucide-react'
 import { query } from '../../db/db'
 import { upsertSustainabilityMetric, deleteSustainabilityMetric } from '../../db/extractionDb'
 import { SlideOver } from '../../components/SlideOver'
@@ -10,6 +10,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { StatCard } from '../../components/StatCard'
 import { useToast } from '../../components/useToast'
 import { formatPct } from '../../utils/format'
+import { downloadCsv } from '../../utils/exportCsv'
 import { axisTickProps, gridProps, tooltipStyle } from '../../utils/chartConfig'
 
 interface SustainabilityRow {
@@ -154,9 +155,19 @@ export function SustainabilityTab({ institutionId }: { institutionId: number }) 
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-700">Sustainability Metrics</h3>
-        <button onClick={openAdd} className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
-          <Plus size={14} /> Add Year
-        </button>
+        <div className="flex gap-2">
+          {rows.length > 0 && (
+            <button
+              onClick={() => downloadCsv('sustainability.csv', rows as unknown as Record<string, unknown>[])}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
+            >
+              <Download size={14} /> Export CSV
+            </button>
+          )}
+          <button onClick={openAdd} className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
+            <Plus size={14} /> Add Year
+          </button>
+        </div>
       </div>
 
       {rows.length === 0 ? (

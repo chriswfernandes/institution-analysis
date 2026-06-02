@@ -3,9 +3,10 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   BarChart, ResponsiveContainer, Cell,
 } from 'recharts'
-import { Plus, Pencil, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, Download } from 'lucide-react'
 import { query } from '../../db/db'
 import { upsertFinancialSummary, deleteFinancialSummary } from '../../db/extractionDb'
+import { downloadCsv } from '../../utils/exportCsv'
 import { SlideOver } from '../../components/SlideOver'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { DataTable, type Column } from '../../components/DataTable'
@@ -224,9 +225,19 @@ export function FinancialsTab({ institutionId }: { institutionId: number }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-700">Financial Data</h3>
-        <button onClick={openAdd} className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
-          <Plus size={14} /> Add Entry
-        </button>
+        <div className="flex gap-2">
+          {rows.length > 0 && (
+            <button
+              onClick={() => downloadCsv('financials.csv', rows as unknown as Record<string, unknown>[])}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
+            >
+              <Download size={14} /> Export CSV
+            </button>
+          )}
+          <button onClick={openAdd} className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
+            <Plus size={14} /> Add Entry
+          </button>
+        </div>
       </div>
 
       {rows.length === 0 ? (

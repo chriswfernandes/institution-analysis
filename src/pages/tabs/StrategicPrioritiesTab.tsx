@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Plus, Pencil, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Pencil, Trash2, Download } from 'lucide-react'
 import { query } from '../../db/db'
 import { upsertStrategicPriority, deleteStrategicPriority } from '../../db/extractionDb'
 import { SlideOver } from '../../components/SlideOver'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useToast } from '../../components/useToast'
+import { downloadCsv } from '../../utils/exportCsv'
 
 interface PlanRow {
   id: number
@@ -142,9 +143,19 @@ export function StrategicPrioritiesTab({ institutionId }: { institutionId: numbe
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-700">Strategic Priorities</h3>
-        <button onClick={openAdd} className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
-          <Plus size={14} /> Add Priority
-        </button>
+        <div className="flex gap-2">
+          {priorities.length > 0 && (
+            <button
+              onClick={() => downloadCsv('strategic-priorities.csv', priorities.map((p) => ({ ...p, key_initiatives: p.key_initiatives ?? '' })))}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
+            >
+              <Download size={14} /> Export CSV
+            </button>
+          )}
+          <button onClick={openAdd} className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
+            <Plus size={14} /> Add Priority
+          </button>
+        </div>
       </div>
 
       {/* Plan banner */}
