@@ -133,6 +133,19 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 
 ---
 
+## Phase 8.1 — Institution Detail Tab Bar Scrollability
+**File:** `PRP_Phase8.1_Tab_Bar_Scrollability.md`
+
+*The 7-tab bar on Institution Detail clips on screens narrower than ~1100px, making Financials, KPIs, Strategic Priorities, and Sustainability unreachable.*
+
+- [ ] Outer div holds `border-b` (static, never clipped); inner div holds `overflow-x-auto -mb-px`
+- [ ] Each tab button gets `shrink-0` to prevent compression
+- [ ] Active-tab green underline remains flush with the border at all widths
+- [ ] `.scrollbar-hide` utility added to `src/index.css` if not already present
+- [ ] Verified at 768px: all 7 tabs scrollable and selectable
+
+---
+
 ## Phase 9 — Bulk Institution Import
 **File:** `PRP_Phase9_Bulk_Import.md`
 
