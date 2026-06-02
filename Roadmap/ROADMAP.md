@@ -197,21 +197,8 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 
 ---
 
-## Phase 12 — Extraction Review UI
-**File:** `PRP_Phase12_Extraction_Review_UI.md`
-
-*Adds an "Extracted Data" panel inside the Document Detail slide-over showing every row the pipeline wrote, with per-row delete and a "Clear All Extractions" bulk action.*
-
-- [ ] `DocumentDetailPanel.tsx`: collapsible "Extracted Data" section queries all four extraction tables by document_id
-- [ ] Per-row ✕ delete with toast; reloads summary after each delete
-- [ ] "Clear All Extractions" button with ConfirmDialog
-- [ ] `extractionDb.ts`: new `clearExtractionsForDocument(documentId)` helper
-- [ ] Section only shown when `processing_status === 'processed'`
-
----
-
-## Phase 13 — Re-process Guard
-**File:** `PRP_Phase13_Reprocess_Guard.md`
+## Phase 12 — Re-process Guard
+**File:** `PRP_Phase12_Reprocess_Guard.md`
 
 *Makes extraction writes idempotent: re-processing a document replaces existing rows rather than duplicating them. Adds a low-confidence warning banner in the classification confirmation modal.*
 
@@ -220,6 +207,19 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 - [ ] `ClassificationResult` type: add `lowConfidence?: boolean`
 - [ ] `ClassificationConfirmModal`: amber warning banner when `lowConfidence` is true
 - [ ] `DocumentDetailPanel.tsx`: re-process confirm message updated to mention data replacement
+
+---
+
+## Phase 13 — Extraction Review UI
+**File:** `PRP_Phase13_Extraction_Review_UI.md`
+
+*Adds an "Extracted Data" panel inside the Document Detail slide-over showing every row the pipeline wrote, with per-row delete and a "Clear All Extractions" bulk action.*
+
+- [ ] `DocumentDetailPanel.tsx`: collapsible "Extracted Data" section queries all four extraction tables by document_id
+- [ ] Per-row ✕ delete with toast; reloads summary after each delete
+- [ ] "Clear All Extractions" button with ConfirmDialog
+- [ ] `extractionDb.ts`: new `clearExtractionsForDocument(documentId)` helper
+- [ ] Section only shown when `processing_status === 'processed'`
 
 ---
 

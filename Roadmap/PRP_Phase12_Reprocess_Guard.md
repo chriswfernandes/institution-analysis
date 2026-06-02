@@ -1,4 +1,4 @@
-# PRP — Phase 13: Re-process Guard (Upsert Extraction Writes)
+# PRP — Phase 12: Re-process Guard (Upsert Extraction Writes)
 
 ## Context
 
