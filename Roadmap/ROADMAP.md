@@ -146,6 +146,18 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 
 ---
 
+## Phase 8.2 — Sample Data Backfill
+**File:** `PRP_Phase8.2_Sample_Data_Backfill.md`
+
+*Users whose localStorage database pre-dates Phase 4.1 have UBC/U of T institutions but no financial, KPI, priority, or sustainability rows. The seed guard blocks a re-run. This phase adds an auto-backfill on startup and a Settings "Reset to Sample Data" escape hatch.*
+
+- [ ] `backfillSeedData()` in `seedData.ts` — checks COUNT per table per institution, inserts only missing rows
+- [ ] `clearAndReseed()` in `seedData.ts` — deletes all data tables, then runs `seedDatabase()`
+- [ ] `db.ts` calls `backfillSeedData()` after `initSchema()` on every page load (no-op if data present)
+- [ ] Settings page: "Reset to Sample Data" danger zone with ConfirmDialog → `clearAndReseed()` → toast + navigate
+
+---
+
 ## Phase 9 — Bulk Institution Import
 **File:** `PRP_Phase9_Bulk_Import.md`
 
