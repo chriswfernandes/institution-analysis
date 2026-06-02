@@ -113,7 +113,11 @@ export function Institutions() {
           {filtered.map((inst) => {
             const instTags = tags.length > 0 ? getTagsForInstitution(inst.id) : []
             return (
-              <div key={inst.id} className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-3">
+              <div
+                key={inst.id}
+                onClick={() => navigate(`/institutions/${inst.id}`)}
+                className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-3 cursor-pointer hover:border-green-400 hover:shadow-sm transition-all"
+              >
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <h2 className="font-semibold text-slate-900 text-base leading-tight">{inst.name}</h2>
@@ -137,7 +141,7 @@ export function Institutions() {
 
                 <p className="text-xs text-slate-400">{inst.document_count ?? 0} document{inst.document_count !== 1 ? 's' : ''}</p>
 
-                <div className="flex gap-2 mt-auto pt-1">
+                <div className="flex gap-2 mt-auto pt-1" onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => navigate(`/institutions/${inst.id}`)}
                     className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
                     View
