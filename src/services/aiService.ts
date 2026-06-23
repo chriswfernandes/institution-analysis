@@ -14,6 +14,12 @@ const SYSTEM_PROMPT = `You are a higher education sector analyst specializing in
 
 Always output valid JSON only, with no preamble, explanation, or markdown fences. The JSON must be parseable by JSON.parse() with no modifications.`
 
+const MARKDOWN_NOTE = `The document text below is in Markdown produced by Docling. Tables are represented as Markdown pipe tables (rows separated by newlines, cells by "|") — read them column-by-column and align each value with its row and column header. Headings (#) mark sections.`
+
+function getProvider(): 'azure' | 'litellm' {
+  return getSetting('ai_provider') === 'litellm' ? 'litellm' : 'azure'
+}
+
 function getAzureConfig(): {
   endpoint: string
   apiKey: string
@@ -32,13 +38,24 @@ function getAzureConfig(): {
   return { endpoint, apiKey, deployment, apiVersion: apiVersion ?? '2024-02-15-preview' }
 }
 
-async function callAzureOpenAI(
+function getLiteLLMConfig(): { baseUrl: string; apiKey: string; model: string } {
+  const baseUrl = getSetting('litellm_base_url')
+  const apiKey = getSetting('litellm_api_key')
+  const model = getSetting('litellm_model')
+
+  if (!baseUrl) throw new Error('Please configure the LiteLLM Base URL in Settings before processing.')
+  if (!apiKey) throw new Error('Please configure the LiteLLM API key in Settings before processing.')
+  if (!model) throw new Error('Please configure the LiteLLM model name in Settings before processing.')
+
+  return { baseUrl, apiKey, model }
+}
+
+async function callLLM(
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
   options?: { jsonMode?: boolean; temperature?: number; maxTokens?: number }
 ): Promise<string> {
-  const { endpoint, apiKey, deployment, apiVersion } = getAzureConfig()
-  const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`
-
+  let url: string
+  let headers: Record<string, string>
   const body: Record<string, unknown> = {
     messages,
     temperature: options?.temperature ?? 0.1,
@@ -48,12 +65,23 @@ async function callAzureOpenAI(
     body.response_format = { type: 'json_object' }
   }
 
+  if (getProvider() === 'litellm') {
+    const { baseUrl, apiKey, model } = getLiteLLMConfig()
+    url = `${baseUrl.replace(/\/$/, '')}/chat/completions`
+    headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+    body.model = model
+  } else {
+    const { endpoint, apiKey, deployment, apiVersion } = getAzureConfig()
+    url = `${endpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`
+    headers = { 'api-key': apiKey, 'Content-Type': 'application/json' }
+  }
+
   let lastError: Error | null = null
   for (let attempt = 0; attempt < 4; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 10000))
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'api-key': apiKey, 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     })
     if (resp.status === 429) {
@@ -61,12 +89,12 @@ async function callAzureOpenAI(
       continue
     }
     if (!resp.ok) {
-      throw new Error(`Azure OpenAI error: ${resp.status} ${resp.statusText}`)
+      throw new Error(`LLM error: ${resp.status} ${resp.statusText}`)
     }
     const data = await resp.json() as { choices: { message: { content: string } }[] }
     return data.choices[0].message.content
   }
-  throw lastError ?? new Error('Azure OpenAI request failed after retries')
+  throw lastError ?? new Error('LLM request failed after retries')
 }
 
 async function parseJsonWithRetry<T>(
@@ -85,7 +113,7 @@ async function parseJsonWithRetry<T>(
 
 export async function testConnection(): Promise<{ success: boolean; message: string }> {
   try {
-    await callAzureOpenAI([
+    await callLLM([
       { role: 'system', content: 'Reply with exactly: ok' },
       { role: 'user', content: 'ping' },
     ], { maxTokens: 10 })
@@ -114,12 +142,12 @@ ${text0}
 ${text1}
 ---`
 
-  const raw = await callAzureOpenAI(
+  const raw = await callLLM(
     [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
     { jsonMode: true }
   )
   return parseJsonWithRetry<ClassificationResult>(raw, () =>
-    callAzureOpenAI(
+    callLLM(
       [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' },
@@ -140,7 +168,9 @@ export async function extractFinancials(chunks: ChunkRow[]): Promise<FinancialEx
 
   for (const batch of batches) {
     for (const chunk of batch) {
-      const userMsg = `Extract financial data from the following text of a Canadian post-secondary institution's financial statement.
+      const userMsg = `${MARKDOWN_NOTE}
+
+Extract financial data from the following text of a Canadian post-secondary institution's financial statement.
 
 Return a JSON object with exactly these fields (use null for any value not found in the text):
 {
@@ -169,12 +199,12 @@ Document text (chunk ${chunk.chunk_index + 1} of ${chunks.length}):
 ${chunk.chunk_text}
 ---`
 
-      const raw = await callAzureOpenAI(
+      const raw = await callLLM(
         [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
         { jsonMode: true }
       )
       const parsed = await parseJsonWithRetry<FinancialExtraction>(raw, () =>
-        callAzureOpenAI(
+        callLLM(
           [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' }],
           { jsonMode: true }
         )
@@ -190,7 +220,9 @@ export async function extractStrategicPriorities(chunks: ChunkRow[]): Promise<St
   const results: StrategicExtraction[] = []
 
   for (const chunk of chunks) {
-    const userMsg = `Extract strategic priorities from the following text of a Canadian post-secondary institution's strategic plan.
+    const userMsg = `${MARKDOWN_NOTE}
+
+Extract strategic priorities from the following text of a Canadian post-secondary institution's strategic plan.
 
 Return a JSON object with exactly this structure:
 {
@@ -216,12 +248,12 @@ Document text (chunk ${chunk.chunk_index + 1} of ${chunks.length}):
 ${chunk.chunk_text}
 ---`
 
-    const raw = await callAzureOpenAI(
+    const raw = await callLLM(
       [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
       { jsonMode: true }
     )
     const parsed = await parseJsonWithRetry<StrategicExtraction>(raw, () =>
-      callAzureOpenAI(
+      callLLM(
         [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' }],
         { jsonMode: true }
       )
@@ -247,7 +279,9 @@ export async function extractSustainability(chunks: ChunkRow[]): Promise<Sustain
   const results: SustainabilityExtraction[] = []
 
   for (const chunk of chunks) {
-    const userMsg = `Extract sustainability and environmental data from the following text of a Canadian post-secondary institution's sustainability report.
+    const userMsg = `${MARKDOWN_NOTE}
+
+Extract sustainability and environmental data from the following text of a Canadian post-secondary institution's sustainability report.
 
 Return a JSON object with exactly these fields (null for anything not found):
 {
@@ -272,12 +306,12 @@ Document text (chunk ${chunk.chunk_index + 1} of ${chunks.length}):
 ${chunk.chunk_text}
 ---`
 
-    const raw = await callAzureOpenAI(
+    const raw = await callLLM(
       [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
       { jsonMode: true }
     )
     const parsed = await parseJsonWithRetry<SustainabilityExtraction>(raw, () =>
-      callAzureOpenAI(
+      callLLM(
         [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' }],
         { jsonMode: true }
       )
@@ -300,7 +334,9 @@ export async function extractKeyFacts(
   const seenNames = new Set<string>()
 
   for (const chunk of chunks) {
-    const userMsg = `Extract key facts and data points from the following institutional document text. ${hint}
+    const userMsg = `${MARKDOWN_NOTE}
+
+Extract key facts and data points from the following institutional document text. ${hint}
 
 Return a JSON object:
 {
@@ -323,12 +359,12 @@ Document text (chunk ${chunk.chunk_index + 1} of ${chunks.length}):
 ${chunk.chunk_text}
 ---`
 
-    const raw = await callAzureOpenAI(
+    const raw = await callLLM(
       [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
       { jsonMode: true }
     )
     const parsed = await parseJsonWithRetry<KeyFactsExtraction>(raw, () =>
-      callAzureOpenAI(
+      callLLM(
         [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' }],
         { jsonMode: true }
       )
@@ -345,9 +381,6 @@ ${chunk.chunk_text}
 }
 
 export async function generateInsights(institutionName: string, compiledData: string): Promise<string> {
-  const { endpoint, apiKey, deployment, apiVersion } = getAzureConfig()
-  const url = `${endpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`
-
   const userPrompt = `You are a senior consultant at Deloitte Canada's Government & Public Services Higher Education practice.
 
 You have been given structured data about ${institutionName}, a Canadian post-secondary institution. Your task is to produce a consulting intelligence briefing that a partner would use to prepare for a client meeting.
@@ -371,23 +404,7 @@ List the dominant strategic themes evident in the data (e.g. Indigenization, Dig
 INSTITUTION DATA:
 ${compiledData}`
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'api-key': apiKey },
-    body: JSON.stringify({
-      messages: [{ role: 'user', content: userPrompt }],
-      temperature: 0.4,
-      max_tokens: 2000,
-    }),
-  })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Azure OpenAI error ${response.status}: ${text}`)
-  }
-
-  const data = await response.json()
-  return data.choices[0].message.content as string
+  return callLLM([{ role: 'user', content: userPrompt }], { temperature: 0.4, maxTokens: 2000 })
 }
 
 // Merges an array of objects: first non-null value wins for each key

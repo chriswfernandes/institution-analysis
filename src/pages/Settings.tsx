@@ -5,6 +5,7 @@ import { getAllDocuments } from '../db/documentDb'
 import { useAppDispatch, useAppState } from '../context/AppContext'
 import { useToast } from '../components/useToast'
 import { testConnection } from '../services/aiService'
+import { testDoclingConnection } from '../services/doclingService'
 import { seedDatabase, clearAndReseed } from '../db/seedData'
 import { downloadCsv } from '../utils/exportCsv'
 
@@ -48,10 +49,15 @@ export function Settings() {
   const { dbReady } = useAppState()
   const showToast = useToast()
 
+  const [provider, setProvider] = useState<'azure' | 'litellm'>('azure')
   const [endpoint, setEndpoint] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [deployment, setDeployment] = useState('')
   const [apiVersion, setApiVersion] = useState('2024-02-15-preview')
+  const [litellmBaseUrl, setLitellmBaseUrl] = useState('')
+  const [litellmKey, setLitellmKey] = useState('')
+  const [litellmModel, setLitellmModel] = useState('')
+  const [doclingEndpoint, setDoclingEndpoint] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [lastExport, setLastExport] = useState<string | null>(null)
 
@@ -66,10 +72,15 @@ export function Settings() {
 
   useEffect(() => {
     if (!dbReady) return
+    setProvider(getSetting('ai_provider') === 'litellm' ? 'litellm' : 'azure')
     setEndpoint(getSetting('azure_openai_endpoint') ?? '')
     setApiKey(getSetting('azure_openai_api_key') ?? '')
     setDeployment(getSetting('azure_openai_deployment') ?? '')
     setApiVersion(getSetting('azure_openai_api_version') ?? '2024-02-15-preview')
+    setLitellmBaseUrl(getSetting('litellm_base_url') ?? '')
+    setLitellmKey(getSetting('litellm_api_key') ?? '')
+    setLitellmModel(getSetting('litellm_model') ?? '')
+    setDoclingEndpoint(getSetting('docling_endpoint') ?? '')
     setLastExport(getSetting('last_export_at'))
     loadTags()
   }, [dbReady])
@@ -81,10 +92,15 @@ export function Settings() {
   }
 
   function saveSettings() {
+    setSetting('ai_provider', provider)
     setSetting('azure_openai_endpoint', endpoint)
     setSetting('azure_openai_api_key', apiKey)
     setSetting('azure_openai_deployment', deployment)
     setSetting('azure_openai_api_version', apiVersion)
+    setSetting('litellm_base_url', litellmBaseUrl)
+    setSetting('litellm_api_key', litellmKey)
+    setSetting('litellm_model', litellmModel)
+    setSetting('docling_endpoint', doclingEndpoint)
     showToast('success', 'Settings saved')
   }
 
@@ -234,34 +250,70 @@ export function Settings() {
     <div className="max-w-2xl space-y-8">
       <h1 className="text-2xl font-semibold text-slate-900">Settings</h1>
 
-      {/* Azure OpenAI */}
+      {/* AI Provider */}
       <section className="bg-white rounded-xl border border-slate-200 p-6">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">Azure OpenAI Configuration</h2>
+        <h2 className="text-base font-semibold text-slate-900 mb-4">AI Provider Configuration</h2>
         <div className="space-y-4">
-          <Field label="Endpoint URL" htmlFor="az-endpoint">
-            <input id="az-endpoint" type="text" value={endpoint} onChange={(e) => setEndpoint(e.target.value)}
-              placeholder="https://your-resource.openai.azure.com/"
-              className="input" />
+          <Field label="Provider" htmlFor="ai-provider">
+            <select id="ai-provider" value={provider}
+              onChange={(e) => setProvider(e.target.value as 'azure' | 'litellm')}
+              className="input">
+              <option value="azure">Azure OpenAI</option>
+              <option value="litellm">LiteLLM (OpenAI-compatible)</option>
+            </select>
           </Field>
-          <Field label="API Key" htmlFor="az-key">
-            <div className="relative">
-              <input id="az-key" type={showKey ? 'text' : 'password'} value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-                className="input pr-10" />
-              <button type="button" onClick={() => setShowKey(!showKey)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                aria-label={showKey ? 'Hide key' : 'Show key'}>
-                {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </Field>
-          <Field label="Deployment Name" htmlFor="az-deployment">
-            <input id="az-deployment" type="text" value={deployment} onChange={(e) => setDeployment(e.target.value)}
-              placeholder="gpt-4o" className="input" />
-          </Field>
-          <Field label="API Version" htmlFor="az-version">
-            <input id="az-version" type="text" value={apiVersion} onChange={(e) => setApiVersion(e.target.value)}
-              className="input" />
-          </Field>
+
+          {provider === 'azure' ? (
+            <>
+              <Field label="Endpoint URL" htmlFor="az-endpoint">
+                <input id="az-endpoint" type="text" value={endpoint} onChange={(e) => setEndpoint(e.target.value)}
+                  placeholder="https://your-resource.openai.azure.com/"
+                  className="input" />
+              </Field>
+              <Field label="API Key" htmlFor="az-key">
+                <div className="relative">
+                  <input id="az-key" type={showKey ? 'text' : 'password'} value={apiKey} onChange={(e) => setApiKey(e.target.value)}
+                    className="input pr-10" />
+                  <button type="button" onClick={() => setShowKey(!showKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    aria-label={showKey ? 'Hide key' : 'Show key'}>
+                    {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </Field>
+              <Field label="Deployment Name" htmlFor="az-deployment">
+                <input id="az-deployment" type="text" value={deployment} onChange={(e) => setDeployment(e.target.value)}
+                  placeholder="gpt-4o" className="input" />
+              </Field>
+              <Field label="API Version" htmlFor="az-version">
+                <input id="az-version" type="text" value={apiVersion} onChange={(e) => setApiVersion(e.target.value)}
+                  className="input" />
+              </Field>
+            </>
+          ) : (
+            <>
+              <Field label="Base URL" htmlFor="ll-base">
+                <input id="ll-base" type="text" value={litellmBaseUrl} onChange={(e) => setLitellmBaseUrl(e.target.value)}
+                  placeholder="http://localhost:4000/v1"
+                  className="input" />
+              </Field>
+              <Field label="API Key" htmlFor="ll-key">
+                <div className="relative">
+                  <input id="ll-key" type={showKey ? 'text' : 'password'} value={litellmKey} onChange={(e) => setLitellmKey(e.target.value)}
+                    className="input pr-10" />
+                  <button type="button" onClick={() => setShowKey(!showKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    aria-label={showKey ? 'Hide key' : 'Show key'}>
+                    {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </Field>
+              <Field label="Model Name" htmlFor="ll-model">
+                <input id="ll-model" type="text" value={litellmModel} onChange={(e) => setLitellmModel(e.target.value)}
+                  placeholder="gpt-5.4" className="input" />
+              </Field>
+            </>
+          )}
         </div>
         <div className="flex gap-3 mt-5">
           <button onClick={saveSettings}
@@ -272,6 +324,36 @@ export function Settings() {
             onClick={async () => {
               showToast('info', 'Testing connection…')
               const result = await testConnection()
+              showToast(result.success ? 'success' : 'error', result.message)
+            }}
+            className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">
+            Test Connection
+          </button>
+        </div>
+      </section>
+
+      {/* Document Conversion (Docling) */}
+      <section className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-base font-semibold text-slate-900 mb-1">Document Conversion (Docling)</h2>
+        <p className="text-xs text-slate-400 mb-4">
+          Uploaded files are converted to Markdown by a Docling Serve instance before extraction.
+        </p>
+        <div className="space-y-4">
+          <Field label="Endpoint URL" htmlFor="docling-endpoint">
+            <input id="docling-endpoint" type="text" value={doclingEndpoint}
+              onChange={(e) => setDoclingEndpoint(e.target.value)}
+              placeholder="http://localhost:5001" className="input" />
+          </Field>
+        </div>
+        <div className="flex gap-3 mt-5">
+          <button onClick={saveSettings}
+            className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
+            Save Settings
+          </button>
+          <button
+            onClick={async () => {
+              showToast('info', 'Testing Docling connection…')
+              const result = await testDoclingConnection()
               showToast(result.success ? 'success' : 'error', result.message)
             }}
             className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">

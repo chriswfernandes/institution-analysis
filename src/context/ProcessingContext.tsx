@@ -2,7 +2,7 @@ import { createContext, useContext, useReducer, useCallback, type ReactNode } fr
 
 export type ProcessingStep =
   | 'reading'
-  | 'extracting'
+  | 'converting'
   | 'chunking'
   | 'saving'
   | 'classifying'

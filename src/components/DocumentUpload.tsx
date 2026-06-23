@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, type DragEvent, type ChangeEvent } from 'react'
 import { UploadCloud } from 'lucide-react'
-import { extractPdfText } from '../services/pdfService'
+import { convertToMarkdown } from '../services/doclingService'
 import { createDocument, saveChunks, updateDocumentStatus } from '../db/documentDb'
 import { getAllDocuments } from '../db/documentDb'
 import { useAppState, useAppDispatch } from '../context/AppContext'
@@ -9,6 +9,16 @@ import { useToast } from './useToast'
 import { ClassificationConfirmModal } from './ClassificationConfirmModal'
 import { runProcessingPipeline } from '../services/processingPipeline'
 import type { ClassificationResult } from '../types'
+
+const ACCEPTED_EXTENSIONS = [
+  '.pdf', '.docx', '.pptx', '.xlsx', '.html', '.htm',
+  '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp', '.webp',
+]
+
+function isAccepted(file: File): boolean {
+  const name = file.name.toLowerCase()
+  return ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext))
+}
 
 interface Props {
   institutionId?: number
@@ -40,9 +50,9 @@ export function DocumentUpload({ institutionId, onUploaded }: Props) {
   )
 
   async function processFiles(files: File[]) {
-    const pdfFiles = files.filter((f) => f.type === 'application/pdf')
-    if (pdfFiles.length === 0) {
-      showToast('error', 'Only PDF files are supported')
+    const acceptedFiles = files.filter(isAccepted)
+    if (acceptedFiles.length === 0) {
+      showToast('error', 'Unsupported file type')
       return
     }
 
@@ -52,22 +62,22 @@ export function DocumentUpload({ institutionId, onUploaded }: Props) {
       return
     }
 
-    for (const file of pdfFiles) {
+    for (const file of acceptedFiles) {
       const jobId = `${Date.now()}-${file.name}`
       addJob({ id: jobId, fileName: file.name, step: 'reading', progress: 0 })
       let docId: number | null = null
 
       try {
-        updateJob({ id: jobId, step: 'extracting', progress: 25 })
-        const { text, pageCount, wordCount, chunks } = await extractPdfText(file)
+        updateJob({ id: jobId, step: 'converting', progress: 25 })
+        const { markdown, wordCount, chunks } = await convertToMarkdown(file)
 
         updateJob({ id: jobId, step: 'chunking', progress: 50 })
         docId = createDocument({
           institution_id: instId,
           filename: file.name,
-          page_count: pageCount,
+          page_count: 0,
           word_count: wordCount,
-          raw_text: text,
+          raw_text: markdown,
         })
 
         updateJob({ id: jobId, step: 'saving', progress: 75 })
@@ -157,12 +167,12 @@ export function DocumentUpload({ institutionId, onUploaded }: Props) {
           }`}
         >
           <UploadCloud size={32} className="mx-auto text-slate-400 mb-3" />
-          <p className="text-sm font-medium text-slate-700">Drop PDFs here or click to browse</p>
-          <p className="text-xs text-slate-400 mt-1">PDF files only · Multiple files supported</p>
+          <p className="text-sm font-medium text-slate-700">Drop documents here or click to browse</p>
+          <p className="text-xs text-slate-400 mt-1">PDF, Word, PowerPoint, Excel, HTML, and images · Multiple files supported</p>
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,application/pdf"
+            accept={ACCEPTED_EXTENSIONS.join(',')}
             multiple
             className="hidden"
             onChange={onInputChange}

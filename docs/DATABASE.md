@@ -268,10 +268,15 @@ Simple key/value store for application configuration.
 | `value` | TEXT | Setting value |
 
 **Keys in use:**
+- `ai_provider` — selected LLM provider: `azure` (default) or `litellm`
 - `azure_openai_endpoint` — Azure OpenAI resource URL
 - `azure_openai_api_key` — API key (stored in localStorage, not transmitted server-side)
 - `azure_openai_deployment` — Deployment name, e.g. `gpt-4o`
 - `azure_openai_api_version` — e.g. `2024-02-15-preview`
+- `litellm_base_url` — LiteLLM (OpenAI-compatible) base URL, e.g. `http://localhost:4000/v1`
+- `litellm_api_key` — LiteLLM master/virtual key (sent as a bearer token)
+- `litellm_model` — public model name registered in the proxy, e.g. `gpt-5.4`
+- `docling_endpoint` — Docling Serve base URL used to convert uploads to Markdown, e.g. `http://localhost:5001`
 - `last_export_at` — ISO datetime of last DB export
 
 ---

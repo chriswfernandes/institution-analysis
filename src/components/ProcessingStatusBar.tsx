@@ -3,7 +3,7 @@ import { useProcessing, type ProcessingStep } from '../context/ProcessingContext
 
 const STEP_LABELS: Record<ProcessingStep, string> = {
   reading: 'Reading…',
-  extracting: 'Extracting text…',
+  converting: 'Converting with Docling…',
   chunking: 'Chunking…',
   saving: 'Saving…',
   classifying: 'Classifying…',

@@ -223,4 +223,56 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 
 ---
 
+## Phase 14 — LiteLLM Provider Support
+**File:** `PRP_Phase14_LiteLLM_Provider.md`
+
+*Adds a LiteLLM (OpenAI-compatible) provider alongside the existing direct-Azure path, so the app can send prompts through a LiteLLM proxy (e.g. the Polaris stack). The proxy holds the real provider keys; the client only needs a base URL, bearer token, and model name. Azure remains the default — no existing behavior changes unless the user opts in.*
+
+- [ ] New `app_settings` keys: `ai_provider` (`azure` | `litellm`), `litellm_base_url`, `litellm_api_key`, `litellm_model` (no schema change)
+- [ ] `aiService.ts`: add `getProvider()` + `getLiteLLMConfig()`; replace `callAzureOpenAI()` with provider-agnostic `callLLM()` (Bearer auth + `model` in body for LiteLLM, `api-key` header for Azure)
+- [ ] `aiService.ts`: migrate all call sites and fold `generateInsights()` into `callLLM()`
+- [ ] `Settings.tsx`: provider dropdown + conditional LiteLLM fields (Base URL, API Key, Model Name); load/save new keys; existing "Test Connection" routes through `callLLM()`
+- [ ] `docs/DATABASE.md`: document the four new `app_settings` keys
+
+---
+
+## Phase 15 — Docling Document Conversion
+**File:** `PRP_Phase15_Docling_Ingestion.md`
+
+*Replaces the in-browser pdfjs text extraction with a Docling Serve conversion-to-Markdown step. Any uploaded file (PDF, Word, PowerPoint, Excel, HTML, images) is converted to Markdown — tables preserved — then chunked and fed to the existing AI extraction pipeline. Docling runs as a separate service the app reaches via a configurable endpoint; it is required for all uploads (no pdfjs fallback).*
+
+- [ ] New `src/services/doclingService.ts`: `convertToMarkdown()` (`POST {endpoint}/v1/convert/file`, reads `document.md_content`), `chunkText()`/`ChunkInput` carried over from pdfService, `testDoclingConnection()`
+- [ ] New `app_settings` key `docling_endpoint` (no schema change); documented in `docs/DATABASE.md`
+- [ ] `Settings.tsx`: "Document Conversion (Docling)" section with endpoint field + Test Connection
+- [ ] Retire pdfjs: delete `pdfService.ts`, remove `pdfjs-dist` from `package.json` and worker config; update `documentDb.ts` import
+- [ ] `ProcessingContext.tsx` + `ProcessingStatusBar.tsx`: add a `converting` step ("Converting with Docling…")
+- [ ] `DocumentUpload.tsx`: broaden accepted file types + `accept`; call `convertToMarkdown()`; store markdown in `raw_text` (page_count 0); updated drop-zone copy
+
+---
+
+## Phase 16 — Markdown-Aware Extraction & Setup Hardening
+**File:** `PRP_Phase16_Markdown_Extraction_Tables.md`
+
+*Tunes the AI extraction to exploit Docling's Markdown tables, confirms the broadened file set routes to the right extractors, hardens the conversion call for slow/large files, and documents how to run Docling Serve (incl. CORS) so the browser SPA can reach it. No schema changes; no change to extraction JSON contracts.*
+
+- [ ] `aiService.ts`: add a shared `MARKDOWN_NOTE` preamble and inject it into the four extraction prompts (financials, sustainability, key facts, strategic)
+- [ ] Verify `documentTypeRegistry.ts` + `ClassificationConfirmModal` route new input formats correctly; extend only if a gap is found
+- [ ] `doclingService.ts`: timeout/abort with friendly errors; document the async endpoint (`/v1/convert/source/async` + poll) as the upgrade path
+- [ ] New `docs/DOCLING.md`: running `docling-serve` (port 5001), enabling CORS for `http://localhost:5173`, pointing the app at it
+- [ ] Verification matrix across PDF, DOCX, PPTX, XLSX, HTML, and image inputs
+
+---
+
+## Phase 17 — Auto-start Docling Serve with the Dev Server
+**File:** `PRP_Phase17_Dev_Autostart_Docling.md`
+
+*Makes `npm run dev` start Docling Serve automatically alongside Vite, so a single command brings up everything needed for uploads. Uses `concurrently` plus a small Node launcher that runs the Docling container (Docker/Podman). Degrades gracefully — if no container runtime is available, Vite still starts.*
+
+- [ ] `package.json`: add `concurrently`; split `dev` into `dev` + `dev:app` + `dev:docling`; add `docling:stop`
+- [ ] New `scripts/start-docling.mjs`: runtime detection (docker/podman), reuse-if-already-running, CORS/UI env flags, signal cleanup, `--stop` mode
+- [ ] `docs/DOCLING.md`: note that `npm run dev` auto-starts Docling; prerequisites (Docker/Podman, first-run image pull)
+- [ ] Graceful fallback: missing container runtime never takes down Vite; `npm run dev:app` runs the frontend only
+
+---
+
 *Each PRP file is a self-contained prompt. Feed it to Claude along with the existing codebase to implement that phase.*

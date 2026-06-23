@@ -1,6 +1,6 @@
 import { query, execute, saveDb } from './db'
 import type { DocumentRow, ChunkRow } from '../types'
-import type { ChunkInput } from '../services/pdfService'
+import type { ChunkInput } from '../services/doclingService'
 
 export interface NewDocument {
   institution_id: number
