@@ -275,4 +275,53 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 
 ---
 
+## Phase 18 — Self-Hosted LiteLLM Container & Static Config
+**File:** `PRP_Phase18_SelfHosted_LiteLLM.md`
+
+*Gives the app its own LiteLLM proxy, independent of the Polaris stack. Mirrors how Polaris builds LiteLLM (same base image, Netskope CA trust, `sitecustomize.py` SSL relaxation) but uses a static Azure `model_list` (no Postgres) and a distinct identity — container `he-tracker-litellm`, image `he-tracker-litellm:latest`, host port 4001 — so both stacks can run at once. Delivered and verified via manual `docker build`/`run`.*
+
+- [ ] New `litellm/litellm.Dockerfile` (ported from Polaris): base `ghcr.io/berriai/litellm:main-latest` + Netskope CA build args → both trust stores
+- [ ] New `litellm/sitecustomize.py` (copied from Polaris): relaxes `ssl.VERIFY_X509_STRICT` for the corporate CAs
+- [ ] New `litellm/litellm_config.yaml`: master key from env, static Azure `model_list` (deployment inline, endpoint/key via env)
+- [ ] New `.env.litellm.example`: `LITELLM_MASTER_KEY`, Azure creds, `NETSKOPE_*_CA_B64`; real `.env.litellm` git-ignored
+- [ ] `.gitignore`: add `.env.litellm`
+- [ ] Verify on port 4001: `/health` + a chat completion through Azure (CA trust works); Polaris's 4000 unaffected
+
+---
+
+## Phase 19 — Colima-Aware Auto-start of LiteLLM
+**File:** `PRP_Phase19_Autostart_LiteLLM.md`
+
+*Auto-starts the self-hosted LiteLLM alongside Vite + Docling, mirroring the Phase 17 Docling pattern. Adds Colima awareness (no Docker Desktop on this machine — the launcher runs `colima start` and waits for the daemon) and build-if-missing for the locally built image. Never takes down Vite if the runtime or `.env.litellm` is absent.*
+
+- [ ] `package.json`: add `litellm` pane to `dev`; add `dev:litellm` + `litellm:stop`
+- [ ] New `scripts/start-litellm.mjs`: Colima ensure/start, build-if-missing (CA build args from `.env.litellm`), reuse-if-running, port-in-use idle, signal cleanup, `--stop`
+- [ ] Graceful fallback: missing runtime / Colima / `.env.litellm` warns and idles; Vite + Docling stay up
+- [ ] Verify: `npm run dev` brings up Vite + Docling + LiteLLM (4001); re-run attaches to existing container; Ctrl+C / `litellm:stop` stops it
+
+---
+
+## Phase 20 — LiteLLM Setup Docs & App Configuration
+**File:** `PRP_Phase20_LiteLLM_Docs_and_Wiring.md`
+
+*Closes the loop with a setup doc (mirroring `docs/DOCLING.md`) and the exact in-app Settings values, then verifies the full ingestion pipeline against the local proxy. No code or schema changes — the app already supports LiteLLM (Phase 14).*
+
+- [ ] New `docs/LITELLM.md`: what it is, one-time setup, running via `npm run dev`, Colima requirement, exact Settings values, adding models, troubleshooting
+- [ ] App Settings: Provider = LiteLLM, Base URL `http://localhost:4001/v1`, API Key = `LITELLM_MASTER_KEY`, Model = `gpt-4o`; Test Connection succeeds
+- [ ] End-to-end verification: upload → Docling convert → classify/extract → insights, all via `localhost:4001`, with Polaris down
+
+---
+
+## Phase 21 — End-to-End Upload Smoke Test
+**File:** `PRP_Phase21_Upload_Smoke_Test.md`
+
+*A repeatable, dependency-light Node smoke test that runs the real ingestion pipeline against the U of T financial report (`UofT/UofT-April-30-2025-Financial-Report.pdf`) and asserts each stage: Docling convert → chunk → LiteLLM classify → LiteLLM extract. Black-box (no Vitest/Playwright); hits the same running containers the app uses and reads the LiteLLM key from `.env.litellm`.*
+
+- [ ] New `scripts/test-upload.mjs`: configurable via env (PDF path, Docling/LiteLLM URLs, model, key) with the fixture as default; mirrors `convertToMarkdown()` + `callLLM()` and the app's prompts
+- [ ] Stage assertions: markdown non-empty + mentions "Toronto" + has a pipe table; ≥1 chunk; classification JSON is Financial Statement/Annual Report for Toronto; financials JSON has a numeric revenue/expenses/net-assets field
+- [ ] `package.json`: add `test:upload` script; exits non-zero on first failure (CI-friendly)
+- [ ] Verify: passes with the stack up; fails fast with a clear message when LiteLLM or Docling is down (catches the stuck-at-"processing" case)
+
+---
+
 *Each PRP file is a self-contained prompt. Feed it to Claude along with the existing codebase to implement that phase.*

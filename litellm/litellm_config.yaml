@@ -1,0 +1,24 @@
+general_settings:
+  # Master API key used to authenticate requests to the proxy.
+  # Also entered as the "API Key" in the app's Settings -> AI Provider.
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  cache: false
+
+# Static model config (no Postgres, no STORE_MODEL_IN_DB). Each model_name
+# becomes a selectable "Model Name" in the app's Settings. The Azure deployment
+# name is not a secret, so it lives here; the endpoint and key come from env
+# (.env.litellm). Add more entries for additional deployments.
+model_list:
+  - model_name: gpt-4o
+    litellm_params:
+      model: azure/gpt-4o
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    # Maps this Azure deployment to LiteLLM's cost/token table (the deployment
+    # name need not match a known model). Silences the "Could not identify azure
+    # model" router warning. Change if your deployment is a different base model.
+    model_info:
+      base_model: azure/gpt-4o

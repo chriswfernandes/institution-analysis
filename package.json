@@ -4,10 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n vite,docling -c cyan,green \"npm:dev:app\" \"npm:dev:docling\"",
+    "dev": "concurrently -n vite,docling,litellm -c cyan,green,magenta \"npm:dev:app\" \"npm:dev:docling\" \"npm:dev:litellm\"",
     "dev:app": "vite",
     "dev:docling": "node scripts/start-docling.mjs",
+    "dev:litellm": "node scripts/start-litellm.mjs",
     "docling:stop": "node scripts/start-docling.mjs --stop",
+    "litellm:stop": "node scripts/start-litellm.mjs --stop",
+    "test:upload": "node scripts/test-upload.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
