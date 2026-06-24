@@ -25,6 +25,7 @@ institutions
   └── institution_themes ── themes
 
 app_settings  (standalone key/value store)
+app_logs      (standalone activity/observability log)
 ```
 
 ---
@@ -84,7 +85,7 @@ One row per uploaded PDF. Tracks the full pipeline lifecycle.
 | `processing_error` | TEXT | Error message if status is `failed` |
 | `page_count` | INTEGER | Extracted by pdfjs-dist |
 | `word_count` | INTEGER | Extracted by pdfjs-dist |
-| `raw_text` | TEXT | Full extracted text (not used for queries, kept for reference) |
+| `raw_text` | TEXT | Legacy column. No longer populated (stored empty) — the full text lives in `document_chunks`; storing a second copy here doubled the localStorage footprint and caused quota failures |
 
 ### `document_chunks`
 The extracted text split into overlapping chunks for AI processing (~12,000 chars each, 200-char overlap).
@@ -279,6 +280,25 @@ Simple key/value store for application configuration.
 - `docling_endpoint` — Docling Serve base URL used to convert uploads to Markdown, e.g. `http://localhost:5001`
 - `last_export_at` — ISO datetime of last DB export
 
+### `app_logs`
+Activity / observability log surfaced in the **Admin** view. Captures LLM calls, Docling conversions, pipeline lifecycle, and upload errors so failures can be inspected and copied after the fact (toasts auto-dismiss). **Metadata only** — full request/response bodies are intentionally not stored, and the table is **capped at the 500 newest rows** (older rows pruned on insert) to keep the in-browser DB small. No foreign key on `document_id`, so logs survive document deletion.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | |
+| `ts` | TEXT | ISO datetime, default `now` |
+| `level` | TEXT NOT NULL | `info`, `warn`, `error` |
+| `category` | TEXT NOT NULL | `llm`, `docling`, `pipeline`, `upload`, `system` |
+| `message` | TEXT NOT NULL | Short human-readable summary |
+| `document_id` | INTEGER | Related document id, nullable (no FK) |
+| `document_name` | TEXT | Denormalized filename for display, nullable |
+| `provider` | TEXT | `azure` or `litellm` (LLM calls), nullable |
+| `model` | TEXT | Model/deployment name (LLM calls), nullable |
+| `purpose` | TEXT | `classify`, `financials`, `strategic`, `sustainability`, `keyFacts`, `insights`, `test`, nullable |
+| `status_code` | INTEGER | HTTP status (LLM/Docling), nullable |
+| `duration_ms` | INTEGER | Request/step duration, nullable |
+| `detail` | TEXT | Longer text (error message + stack), truncated ~2000 chars, nullable |
+
 ---
 
 ## Implementation Files
@@ -290,4 +310,5 @@ Simple key/value store for application configuration.
 | `src/db/documentDb.ts` | CRUD for `documents` and `document_chunks` |
 | `src/db/extractionDb.ts` | Writes for `financial_summaries`, `strategic_plans`, `strategic_priorities`, `sustainability_metrics`, `kpi_datapoints` |
 | `src/db/analysisDb.ts` | CRUD for `analysis_runs` and `analysis_findings` |
+| `src/db/logDb.ts` | Activity log writes/reads for `app_logs` — `addLog()` (insert + prune to 500), `getLogs()`, `clearLogs()`, debounced persistence |
 | `src/db/seedData.ts` | Inserts sample data for UBC and UToronto (Settings → Developer Tools) |

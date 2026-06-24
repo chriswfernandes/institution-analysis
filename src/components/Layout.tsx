@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Database,
+  ScrollText,
 } from 'lucide-react'
 import { ToastContainer } from './ToastContainer'
 import { GlobalSearch } from './GlobalSearch'
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { to: '/institutions', label: 'Institutions', icon: Building2 },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/analysis', label: 'Analysis', icon: BarChart2 },
+  { to: '/admin', label: 'Admin', icon: ScrollText },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

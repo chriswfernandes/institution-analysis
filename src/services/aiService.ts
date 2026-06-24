@@ -1,4 +1,5 @@
 import { getSetting } from '../db/db'
+import { addLog } from '../db/logDb'
 import type {
   ChunkRow,
   ClassificationResult,
@@ -50,12 +51,20 @@ function getLiteLLMConfig(): { baseUrl: string; apiKey: string; model: string } 
   return { baseUrl, apiKey, model }
 }
 
+interface LLMMeta {
+  purpose?: string
+  documentId?: number | null
+  documentName?: string | null
+}
+
 async function callLLM(
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
-  options?: { jsonMode?: boolean; temperature?: number; maxTokens?: number }
+  options?: { jsonMode?: boolean; temperature?: number; maxTokens?: number; meta?: LLMMeta }
 ): Promise<string> {
   let url: string
   let headers: Record<string, string>
+  const provider = getProvider()
+  let model: string
   const body: Record<string, unknown> = {
     messages,
     temperature: options?.temperature ?? 0.1,
@@ -65,34 +74,64 @@ async function callLLM(
     body.response_format = { type: 'json_object' }
   }
 
-  if (getProvider() === 'litellm') {
-    const { baseUrl, apiKey, model } = getLiteLLMConfig()
-    url = `${baseUrl.replace(/\/$/, '')}/chat/completions`
-    headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-    body.model = model
+  if (provider === 'litellm') {
+    const cfg = getLiteLLMConfig()
+    url = `${cfg.baseUrl.replace(/\/$/, '')}/chat/completions`
+    headers = { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' }
+    body.model = cfg.model
+    model = cfg.model
   } else {
     const { endpoint, apiKey, deployment, apiVersion } = getAzureConfig()
     url = `${endpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`
     headers = { 'api-key': apiKey, 'Content-Type': 'application/json' }
+    model = deployment
+  }
+
+  const meta = options?.meta
+  const logBase = {
+    category: 'llm' as const,
+    provider,
+    model,
+    purpose: meta?.purpose ?? null,
+    documentId: meta?.documentId ?? null,
+    documentName: meta?.documentName ?? null,
   }
 
   let lastError: Error | null = null
   for (let attempt = 0; attempt < 4; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 10000))
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    })
-    if (resp.status === 429) {
-      lastError = new Error('Rate limited (429). Retrying…')
-      continue
+    const started = performance.now()
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      })
+      const durationMs = Math.round(performance.now() - started)
+      if (resp.status === 429) {
+        addLog({ ...logBase, level: 'warn', message: `${meta?.purpose ?? 'completion'} rate limited (429), retrying`, statusCode: 429, durationMs })
+        lastError = new Error('Rate limited (429). Retrying…')
+        continue
+      }
+      if (!resp.ok) {
+        // HTTP error: log once and fail fast (preserves original non-retry behavior).
+        addLog({ ...logBase, level: 'error', message: `LLM error ${resp.status} ${resp.statusText}`, statusCode: resp.status, durationMs })
+        throw new Error(`LLM error: ${resp.status} ${resp.statusText}`)
+      }
+      const data = await resp.json() as { choices: { message: { content: string } }[] }
+      addLog({ ...logBase, level: 'info', message: `${meta?.purpose ?? 'completion'} ok`, statusCode: 200, durationMs })
+      return data.choices[0].message.content
+    } catch (e) {
+      const durationMs = Math.round(performance.now() - started)
+      const err = e instanceof Error ? e : new Error(String(e))
+      // The HTTP-error branch above already logged; rethrow it without retrying.
+      if (err.message.startsWith('LLM error:')) throw err
+      // Network/abort failure: retry, logging only once on the final attempt.
+      lastError = err
+      if (attempt === 3) {
+        addLog({ ...logBase, level: 'error', message: `LLM request failed: ${err.message}`, durationMs, detail: err.stack ?? null })
+      }
     }
-    if (!resp.ok) {
-      throw new Error(`LLM error: ${resp.status} ${resp.statusText}`)
-    }
-    const data = await resp.json() as { choices: { message: { content: string } }[] }
-    return data.choices[0].message.content
   }
   throw lastError ?? new Error('LLM request failed after retries')
 }
@@ -116,7 +155,7 @@ export async function testConnection(): Promise<{ success: boolean; message: str
     await callLLM([
       { role: 'system', content: 'Reply with exactly: ok' },
       { role: 'user', content: 'ping' },
-    ], { maxTokens: 10 })
+    ], { maxTokens: 10, meta: { purpose: 'test' } })
     return { success: true, message: 'Connection successful' }
   } catch (e) {
     return { success: false, message: e instanceof Error ? e.message : String(e) }
@@ -144,7 +183,7 @@ ${text1}
 
   const raw = await callLLM(
     [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
-    { jsonMode: true }
+    { jsonMode: true, meta: { purpose: 'classify' } }
   )
   return parseJsonWithRetry<ClassificationResult>(raw, () =>
     callLLM(
@@ -152,7 +191,7 @@ ${text1}
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' },
       ],
-      { jsonMode: true }
+      { jsonMode: true, meta: { purpose: 'classify' } }
     )
   )
 }
@@ -201,12 +240,12 @@ ${chunk.chunk_text}
 
       const raw = await callLLM(
         [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
-        { jsonMode: true }
+        { jsonMode: true, meta: { purpose: 'financials' } }
       )
       const parsed = await parseJsonWithRetry<FinancialExtraction>(raw, () =>
         callLLM(
           [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' }],
-          { jsonMode: true }
+          { jsonMode: true, meta: { purpose: 'financials' } }
         )
       )
       results.push(parsed)
@@ -250,12 +289,12 @@ ${chunk.chunk_text}
 
     const raw = await callLLM(
       [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
-      { jsonMode: true }
+      { jsonMode: true, meta: { purpose: 'strategic' } }
     )
     const parsed = await parseJsonWithRetry<StrategicExtraction>(raw, () =>
       callLLM(
         [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' }],
-        { jsonMode: true }
+        { jsonMode: true, meta: { purpose: 'strategic' } }
       )
     )
     results.push(parsed)
@@ -308,12 +347,12 @@ ${chunk.chunk_text}
 
     const raw = await callLLM(
       [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
-      { jsonMode: true }
+      { jsonMode: true, meta: { purpose: 'sustainability' } }
     )
     const parsed = await parseJsonWithRetry<SustainabilityExtraction>(raw, () =>
       callLLM(
         [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' }],
-        { jsonMode: true }
+        { jsonMode: true, meta: { purpose: 'sustainability' } }
       )
     )
     results.push(parsed)
@@ -361,12 +400,12 @@ ${chunk.chunk_text}
 
     const raw = await callLLM(
       [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
-      { jsonMode: true }
+      { jsonMode: true, meta: { purpose: 'keyFacts' } }
     )
     const parsed = await parseJsonWithRetry<KeyFactsExtraction>(raw, () =>
       callLLM(
         [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg + '\nReturn only valid JSON with no preamble.' }],
-        { jsonMode: true }
+        { jsonMode: true, meta: { purpose: 'keyFacts' } }
       )
     )
     for (const fact of parsed.facts ?? []) {
@@ -404,7 +443,7 @@ List the dominant strategic themes evident in the data (e.g. Indigenization, Dig
 INSTITUTION DATA:
 ${compiledData}`
 
-  return callLLM([{ role: 'user', content: userPrompt }], { temperature: 0.4, maxTokens: 2000 })
+  return callLLM([{ role: 'user', content: userPrompt }], { temperature: 0.4, maxTokens: 2000, meta: { purpose: 'insights' } })
 }
 
 // Merges an array of objects: first non-null value wins for each key

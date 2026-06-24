@@ -22,12 +22,12 @@ export function saveFinancials(
       endowment_value, international_student_revenue, notes
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      institutionId, documentId, data.fiscalYear,
-      data.totalRevenue, data.totalExpenses, data.netSurplusDeficit,
-      data.operatingRevenue, data.operatingExpenses, data.governmentGrants,
-      data.tuitionRevenue, data.researchRevenue, data.investmentIncome,
-      data.totalAssets, data.totalLiabilities, data.netAssets,
-      data.endowmentValue, data.internationalStudentRevenue, data.notes,
+      institutionId, documentId, data.fiscalYear ?? null,
+      data.totalRevenue ?? null, data.totalExpenses ?? null, data.netSurplusDeficit ?? null,
+      data.operatingRevenue ?? null, data.operatingExpenses ?? null, data.governmentGrants ?? null,
+      data.tuitionRevenue ?? null, data.researchRevenue ?? null, data.investmentIncome ?? null,
+      data.totalAssets ?? null, data.totalLiabilities ?? null, data.netAssets ?? null,
+      data.endowmentValue ?? null, data.internationalStudentRevenue ?? null, data.notes ?? null,
     ]
   )
   saveDb()
@@ -46,14 +46,14 @@ export function saveStrategicPlan(
       plan_period_start, plan_period_end, vision_statement
     ) VALUES (?, ?, ?, ?, ?, ?)`,
     [
-      institutionId, documentId, data.planName,
-      data.planPeriodStart, data.planPeriodEnd, data.visionStatement,
+      institutionId, documentId, data.planName ?? null,
+      data.planPeriodStart ?? null, data.planPeriodEnd ?? null, data.visionStatement ?? null,
     ]
   )
   const planRows = query<{ id: number }>('SELECT last_insert_rowid() as id')
   const planId = planRows[0].id
 
-  for (const p of data.priorities) {
+  for (const p of data.priorities ?? []) {
     execute(
       `INSERT INTO strategic_priorities (
         institution_id, strategic_plan_id, document_id,
@@ -62,8 +62,8 @@ export function saveStrategicPlan(
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         institutionId, planId, documentId,
-        p.priorityName, p.priorityDescription, p.pillar,
-        p.progressStatus, JSON.stringify(p.keyInitiatives),
+        p.priorityName ?? null, p.priorityDescription ?? null, p.pillar ?? null,
+        p.progressStatus ?? null, JSON.stringify(p.keyInitiatives ?? []),
       ]
     )
   }
@@ -85,11 +85,11 @@ export function saveSustainability(
       net_zero_target_year, sustainability_certifications
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      institutionId, documentId, data.fiscalYear,
-      data.ghgEmissionsTotal, data.ghgScope1, data.ghgScope2, data.ghgScope3,
-      data.energyConsumption, data.renewableEnergyPct,
-      data.wasteDiversionRate, data.waterConsumption,
-      data.netZeroTargetYear, JSON.stringify(data.sustainabilityCertifications),
+      institutionId, documentId, data.fiscalYear ?? null,
+      data.ghgEmissionsTotal ?? null, data.ghgScope1 ?? null, data.ghgScope2 ?? null, data.ghgScope3 ?? null,
+      data.energyConsumption ?? null, data.renewableEnergyPct ?? null,
+      data.wasteDiversionRate ?? null, data.waterConsumption ?? null,
+      data.netZeroTargetYear ?? null, JSON.stringify(data.sustainabilityCertifications ?? []),
     ]
   )
   saveDb()
@@ -108,8 +108,8 @@ export function saveKeyFacts(
         kpi_category, fiscal_year, value, unit, notes
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        institutionId, documentId, f.kpiName,
-        f.kpiCategory, f.fiscalYear, f.value, f.unit, f.notes,
+        institutionId, documentId, f.kpiName ?? null,
+        f.kpiCategory ?? null, f.fiscalYear ?? null, f.value ?? null, f.unit ?? null, f.notes ?? null,
       ]
     )
   }

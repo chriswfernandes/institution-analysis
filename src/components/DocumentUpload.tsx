@@ -8,6 +8,7 @@ import { useProcessing } from '../context/ProcessingContext'
 import { useToast } from './useToast'
 import { ClassificationConfirmModal } from './ClassificationConfirmModal'
 import { runProcessingPipeline } from '../services/processingPipeline'
+import { addLog } from '../db/logDb'
 import type { ClassificationResult } from '../types'
 
 const ACCEPTED_EXTENSIONS = [
@@ -69,7 +70,7 @@ export function DocumentUpload({ institutionId, onUploaded }: Props) {
 
       try {
         updateJob({ id: jobId, step: 'converting', progress: 25 })
-        const { markdown, wordCount, chunks } = await convertToMarkdown(file)
+        const { wordCount, chunks } = await convertToMarkdown(file)
 
         updateJob({ id: jobId, step: 'chunking', progress: 50 })
         docId = createDocument({
@@ -77,7 +78,10 @@ export function DocumentUpload({ institutionId, onUploaded }: Props) {
           filename: file.name,
           page_count: 0,
           word_count: wordCount,
-          raw_text: markdown,
+          // The full text is already persisted across document_chunks; storing it again
+          // in raw_text (which nothing reads) doubled the localStorage footprint and
+          // pushed large uploads over the quota. Keep it empty to halve per-doc storage.
+          raw_text: '',
         })
 
         updateJob({ id: jobId, step: 'saving', progress: 75 })
@@ -103,6 +107,14 @@ export function DocumentUpload({ institutionId, onUploaded }: Props) {
         dispatch({ type: 'SET_DOCUMENTS', payload: getAllDocuments() })
         removeJob(jobId)
         if (!msg.includes('Cancelled')) {
+          addLog({
+            level: 'error',
+            category: 'upload',
+            message: `Failed to process ${file.name}: ${msg}`,
+            documentId: docId ?? undefined,
+            documentName: file.name,
+            detail: err instanceof Error ? err.stack ?? null : null,
+          })
           showToast('error', `Failed to process ${file.name}: ${msg}`)
         }
       }

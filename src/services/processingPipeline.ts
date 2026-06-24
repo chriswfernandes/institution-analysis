@@ -1,5 +1,6 @@
-import { getChunks, updateDocumentStatus, updateDocumentClassification } from '../db/documentDb'
+import { getChunks, getDocument, updateDocumentStatus, updateDocumentClassification } from '../db/documentDb'
 import { saveDb } from '../db/db'
+import { addLog, setLogContext } from '../db/logDb'
 import {
   classifyDocument,
   extractFinancials,
@@ -23,6 +24,8 @@ export async function runProcessingPipeline(
   onStepChange: (step: ProcessingStep) => void,
   onClassified: (result: ClassificationResult) => Promise<ClassificationResult | null>
 ): Promise<void> {
+  const documentName = getDocument(documentId)?.filename ?? null
+  setLogContext({ documentId, documentName })
   try {
     const chunks = getChunks(documentId)
 
@@ -71,11 +74,24 @@ export async function runProcessingPipeline(
     saveDb()
 
     updateDocumentStatus(documentId, 'processed')
+    addLog({ level: 'info', category: 'pipeline', message: `Processed ${documentName ?? `document ${documentId}`}`, documentId, documentName })
     onStepChange('complete')
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     updateDocumentStatus(documentId, 'failed', message)
+    if (message !== 'Cancelled') {
+      addLog({
+        level: 'error',
+        category: 'pipeline',
+        message: `Processing failed: ${message}`,
+        documentId,
+        documentName,
+        detail: err instanceof Error ? err.stack ?? null : null,
+      })
+    }
     onStepChange('failed')
     throw err
+  } finally {
+    setLogContext(null)
   }
 }

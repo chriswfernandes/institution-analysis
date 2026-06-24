@@ -324,4 +324,29 @@ This file is the master checklist. Each phase has its own PRP (Product Requireme
 
 ---
 
+## Phase 22 — Activity Log Infrastructure
+**File:** `PRP_Phase22_Activity_Log_Infra.md`
+
+*Adds a persistent, capped activity log so pipeline errors and AI/Docling calls are recorded instead of vanishing with the 4-second toast. Metadata only (no request/response bodies), kept to ~500 newest rows with a debounced flush, so the in-browser DB stays small. Data layer for the Phase 23 viewer.*
+
+- [ ] `schema.ts`: new `app_logs` table (ts, level, category, message, document_id/name, provider, model, purpose, status_code, duration_ms, detail); document it in `docs/DATABASE.md`
+- [ ] New `src/db/logDb.ts`: `addLog()` (INSERT + prune to 500), `getLogs(filter)`, `clearLogs()`, debounced `saveDb()` flush (errors flush immediately), optional log document context
+- [ ] Instrument `callLLM()` (provider/model/purpose/status/duration, success + 429 + failure); thread `purpose` from each caller and document context from the pipeline
+- [ ] Instrument `convertToMarkdown()` (Docling start/success/failure) and `runProcessingPipeline()` (terminal processed/failed with stack)
+- [ ] `DocumentUpload` catch: add an error log alongside the existing toast so failures are captured persistently
+
+---
+
+## Phase 23 — Admin Logs Viewer
+**File:** `PRP_Phase23_Admin_Logs_Viewer.md`
+
+*A dedicated `/admin` sidebar view that shows live in-flight processing plus a filterable, auto-refreshing table of the `app_logs` history, with per-row copy, CSV export, and clear. Directly solves "the error toast disappears before I can copy it." UI only; reads Phase 22's log store.*
+
+- [ ] Add `/admin` route in `App.tsx` and an "Admin" item in `Layout.tsx` `NAV_ITEMS`
+- [ ] New `src/pages/Admin.tsx`: live jobs section (from `useProcessing()`) + log table (time, level badge, category, document, message; expandable detail)
+- [ ] Filters (level, category, free-text search) passed into `getLogs()`; auto-refresh ~3s + manual Refresh
+- [ ] Per-row Copy, Export CSV (reuse `exportCsv.ts`), and Clear Logs via `ConfirmDialog`
+
+---
+
 *Each PRP file is a self-contained prompt. Feed it to Claude along with the existing codebase to implement that phase.*

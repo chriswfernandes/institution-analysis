@@ -169,6 +169,22 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS app_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL DEFAULT (datetime('now')),
+  level TEXT NOT NULL,
+  category TEXT NOT NULL,
+  message TEXT NOT NULL,
+  document_id INTEGER,
+  document_name TEXT,
+  provider TEXT,
+  model TEXT,
+  purpose TEXT,
+  status_code INTEGER,
+  duration_ms INTEGER,
+  detail TEXT
+);
+
 INSERT OR IGNORE INTO themes (name, is_system) VALUES
   ('Indigenization', 1),
   ('Digital Transformation', 1),

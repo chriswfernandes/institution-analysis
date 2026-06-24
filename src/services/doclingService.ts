@@ -1,4 +1,5 @@
 import { getSetting } from '../db/db'
+import { addLog } from '../db/logDb'
 
 export interface ChunkInput {
   chunk_index: number
@@ -29,6 +30,25 @@ export async function convertToMarkdown(file: File): Promise<ConversionResult> {
   const form = new FormData()
   form.append('files', file, file.name)
 
+  const started = performance.now()
+  addLog({
+    level: 'info',
+    category: 'docling',
+    message: `Converting ${file.name} (${Math.round(file.size / 1024)} KB)`,
+    documentName: file.name,
+  })
+
+  const fail = (message: string): Error => {
+    addLog({
+      level: 'error',
+      category: 'docling',
+      message,
+      documentName: file.name,
+      durationMs: Math.round(performance.now() - started),
+    })
+    return new Error(message)
+  }
+
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), CONVERSION_TIMEOUT_MS)
   let resp: Response
@@ -36,23 +56,39 @@ export async function convertToMarkdown(file: File): Promise<ConversionResult> {
     resp = await fetch(`${endpoint}/v1/convert/file`, { method: 'POST', body: form, signal: controller.signal })
   } catch (e) {
     if (e instanceof Error && e.name === 'AbortError') {
-      throw new Error(`Docling conversion timed out for ${file.name}. Try a smaller file or enable Docling's async endpoint.`)
+      throw fail(`Docling conversion timed out for ${file.name}. Try a smaller file or enable Docling's async endpoint.`)
     }
-    throw new Error(`Could not reach Docling at ${endpoint}. Is Docling Serve running and reachable?`)
+    throw fail(`Could not reach Docling at ${endpoint}. Is Docling Serve running and reachable?`)
   } finally {
     clearTimeout(timer)
   }
   if (!resp.ok) {
+    addLog({
+      level: 'error',
+      category: 'docling',
+      message: `Docling conversion failed: ${resp.status} ${resp.statusText}`,
+      documentName: file.name,
+      statusCode: resp.status,
+      durationMs: Math.round(performance.now() - started),
+    })
     throw new Error(`Docling conversion failed: ${resp.status} ${resp.statusText}`)
   }
 
   const data = (await resp.json()) as { document?: { md_content?: string } }
   const markdown = data.document?.md_content ?? ''
   if (!markdown.trim()) {
-    throw new Error('Docling returned no markdown content for this file.')
+    throw fail('Docling returned no markdown content for this file.')
   }
 
   const wordCount = markdown.trim().split(/\s+/).filter(Boolean).length
+  addLog({
+    level: 'info',
+    category: 'docling',
+    message: `Converted ${file.name} (${wordCount} words)`,
+    documentName: file.name,
+    statusCode: 200,
+    durationMs: Math.round(performance.now() - started),
+  })
   return { markdown, wordCount, chunks: chunkText(markdown) }
 }
 
